@@ -78,18 +78,25 @@ export class FallbackController {
       return { count: 0, variants: [], fonts: [] };
     }
 
-    // A trusted root declaration is sufficient only when no descendant can
-    // introduce a different language context of its own.
-    const trustWholeDocument = settings.trustCjkLang && (
-      isVariant(declaredRoot) ||
-      (declaredRoot === "zh" && pageVariant === settings.defaultChinese)
-    );
-    const hasNestedLang = document.body?.hasAttribute("lang") || document.querySelector("body [lang]") ||
-      Array.from(this.getOpenShadowRoots()).some((root) => root.host.isConnected && root.querySelector("[lang]"));
-    if (fullScan && !forceOverride && trustWholeDocument && !hasNestedLang) {
+    // A specific root CJK language is the website's explicit choice. With
+    // trust enabled, leave all of its content and font selection to the browser.
+    if (!forceOverride && settings.trustCjkLang && isVariant(declaredRoot)) {
       this.managedStyles.restoreAll();
       this.managedStyles.rules.prune();
       return { count: 0, variants: [], fonts: [] };
+    }
+
+    // Bare zh still needs SC/TC classification. Keep its narrower fast path
+    // only when the classified result matches the browser's configured default.
+    if (fullScan && !forceOverride && settings.trustCjkLang && declaredRoot === "zh" &&
+      pageVariant === settings.defaultChinese) {
+      const hasNestedLang = document.body?.hasAttribute("lang") || document.querySelector("body [lang]") ||
+        Array.from(this.getOpenShadowRoots()).some((root) => root.host.isConnected && root.querySelector("[lang]"));
+      if (!hasNestedLang) {
+        this.managedStyles.restoreAll();
+        this.managedStyles.rules.prune();
+        return { count: 0, variants: [], fonts: [] };
+      }
     }
 
     const candidates = this.collectCandidates(fullScan, roots, elements);
@@ -159,21 +166,36 @@ export class FallbackController {
 
   private createStyleActions(entries: PendingEntry[], settings: Settings): StyleAction[] {
     const actions: StyleAction[] = [];
+    // A run can touch hundreds of elements with the same computed stack. Keep
+    // these decisions local to the run so later website CSS or font changes
+    // are always read and evaluated again.
+    const plans = new Map<string, { fallback: string; skip: boolean }>();
+    const composedValues = new Map<string, string>();
     for (const entry of entries) {
       const { element, existing, variant, baseFamily } = entry;
-      const families = parseFamilies(baseFamily);
-      const fallback = this.fontForVariant(variant, usesSerifFallback(families), settings);
-      if (!fallback || families.some((family) => family.toLowerCase() === fallback.toLowerCase())) {
-        if (existing) this.managedStyles.restore(element);
-        continue;
+      const planKey = JSON.stringify([baseFamily, variant]);
+      let plan = plans.get(planKey);
+      if (!plan) {
+        const families = parseFamilies(baseFamily);
+        const fallback = this.fontForVariant(variant, usesSerifFallback(families), settings);
+        const skip = !fallback ||
+          families.some((family) => family.toLowerCase() === fallback.toLowerCase()) ||
+          this.fontSupport.shouldPreserve(families, settings, variant);
+        plan = { fallback, skip };
+        plans.set(planKey, plan);
       }
-      if (this.fontSupport.shouldPreserve(families, settings, variant)) {
+      if (plan.skip) {
         if (existing) this.managedStyles.restore(element);
         continue;
       }
 
       const inheritedFallbacks = this.managedStyles.inheritedFallbacksFor(element, variant);
-      const appliedValue = composeFontFamily(baseFamily, fallback, variant, inheritedFallbacks);
+      const valueKey = JSON.stringify([planKey, inheritedFallbacks]);
+      let appliedValue = composedValues.get(valueKey);
+      if (appliedValue === undefined) {
+        appliedValue = composeFontFamily(baseFamily, plan.fallback, variant, inheritedFallbacks);
+        composedValues.set(valueKey, appliedValue);
+      }
       const inlineFallback = isInShadowTree(element) ||
         element.style.getPropertyPriority("font-family") === "important";
       const originalInlineValue = inlineFallback ? element.style.getPropertyValue("font-family") : "";
@@ -186,7 +208,7 @@ export class FallbackController {
         inlineFallback,
         originalInlineValue,
         originalInlinePriority,
-        fallback
+        fallback: plan.fallback
       });
     }
     return actions;
