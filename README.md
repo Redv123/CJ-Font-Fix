@@ -72,8 +72,6 @@ npm run build
 
 `npm test` runs local unit tests. `npm run test:sites` checks a local SPA fixture and several live sites in Chromium; the full site suite needs internet access and can be affected by site changes. The optional `npm run test:corpus` uses a locally supplied FLORES-200 archive via `CJ_FLORES_DIR`; its text is not committed or bundled. See the [testing notes](docs/testing.md) for setup and limits. `npm run build` checks TypeScript and produces a loadable extension in `dist`.
 
-GitHub builds release assets from the tagged source via [Build and release](.github/workflows/release.yml). Before publishing a version, add its release text at `docs/releases/v<version>.md`; the workflow requires this file instead of generating a changelog. After committing the version update and notes to `main`, run the workflow from the Actions tab on `main`. It checks the package and manifest versions, runs `npm ci`, unit tests and type checks, builds the extension, then creates the matching `v<version>` tag and Release with the ZIP attached. Pushing a matching version tag also triggers it. Do not create an empty Release first: the workflow creates the Release after the build passes. Live-site and optional corpus tests are not part of this release workflow.
-
 The extension cannot ask Chromium which physical font rendered **each glyph**. It relies on the page's CSS, font metadata, and local availability instead. A few shared Han characters cannot reliably identify a region, and the experimental mixed-language option does not cover every inline layout. Discovered open shadow roots can be handled; closed shadow roots cannot be inspected.
 
 ## License
