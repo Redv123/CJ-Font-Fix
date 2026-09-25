@@ -9,6 +9,7 @@
     "dev": "node scripts/build.mjs --watch",
     "test": "vitest run --exclude 'tests/sites/**'",
     "test:sites": "npm run build && npm run typecheck:sites && playwright test --config playwright.sites.config.ts --grep-invert @corpus",
+    "test:sites:flatpak": "CJ_TEST_CHROMIUM_EXECUTABLE=./scripts/flatpak-chromium.sh npm run test:sites",
     "test:corpus": "npm run build && npm run typecheck:sites && playwright test --config playwright.sites.config.ts --grep @corpus --retries=0",
     "typecheck": "tsc --noEmit",
     "typecheck:sites": "tsc --noEmit -p tests/sites/tsconfig.json"

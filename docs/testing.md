@@ -11,6 +11,7 @@ The tests answer different questions. A passing unit test proves a deterministic
 | `npm run typecheck:sites` | Browser-test TypeScript |
 | `npm run build` | Typecheck and rebuild the loadable MV3 extension in `dist` |
 | `npm run test:sites` | Build, typecheck, then load `dist` in Playwright Chromium for local SPA and live-site checks |
+| `npm run test:sites:flatpak` | Run the same browser cases with the installed Flatpak Chromium (local Linux compatibility check) |
 | `CJ_FLORES_DIR=/path/to/flores200_dataset npm run test:corpus` | Opt-in FLORES-200 page-language evaluation in real Chromium; no corpus text is committed |
 
 `tests/sites/real-sites.spec.ts` currently covers an ordinary DuckDuckGo search, Japanese/SC/TC Wikipedia, and Bangumi. It also checks opt-in Bangumi mixed text, the selected Japanese stack, wrapper restoration, and a mixed-script work title. Live-site failures can be caused by changed markup, redirects, access restrictions, or network conditions; inspect the loaded page before rewriting detection logic. Keep real-page assertions about font order or computed style when a bug concerns rendering, not only about `data-*` labels.
@@ -25,7 +26,7 @@ Obtain the original archive from [Meta's FLORES-200 download link](https://dl.fb
 
 These are long, translated, single-language samples presented in a controlled DOM. A passing score does **not** establish short-title or mixed-page accuracy, nor does it verify real-site DOM sampling or rendered fonts. Keep the live-site cases and inspect their computed and rendered fonts separately. Corpus failures should be reported by source label and case number rather than edited away to preserve a passing score.
 
-The committed site suite launches Playwright's bundled `channel: "chromium"` in a temporary profile. It is **not** the user's Flatpak Chromium or normal browsing profile. Record the actual executable/version and profile when reporting results. Merely swapping executables in an otherwise identical headless temporary-profile run adds limited evidence; a GUI check in the affected everyday environment can expose timing or profile-specific behavior the automation misses. Do not compare performance numbers across different browser versions or environments as if they were controlled samples.
+By default, the committed site suite launches Playwright's bundled `channel: "chromium"` in a temporary profile; this is the reproducible test target. `test:sites:flatpak` instead launches the locally installed `org.chromium.Chromium` through `scripts/flatpak-chromium.sh`. It does not use the normal browsing profile, and Playwright does not guarantee compatibility with a browser version other than its bundled one. The Flatpak run is an additional compatibility check, not a replacement for the default suite. Record the actual executable/version and profile when reporting results. Merely swapping executables in an otherwise identical headless temporary-profile run adds limited evidence; a GUI check in the affected everyday environment can expose timing or profile-specific behavior the automation misses. Do not compare performance numbers across different browser versions or environments as if they were controlled samples.
 
 ## Reproducing a font or icon issue
 

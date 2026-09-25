@@ -68,6 +68,7 @@ test.beforeAll(async () => {
   const extensionDirectory = resolve("dist");
   context = await chromium.launchPersistentContext(profileDirectory, {
     channel: "chromium",
+    executablePath: process.env.CJ_TEST_CHROMIUM_EXECUTABLE,
     headless: true,
     args: [
       `--disable-extensions-except=${extensionDirectory}`,

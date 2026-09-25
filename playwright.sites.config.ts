@@ -9,6 +9,7 @@ export default defineConfig({
   expect: { timeout: 20_000 },
   reporter: "list",
   use: {
+    launchOptions: { executablePath: process.env.CJ_TEST_CHROMIUM_EXECUTABLE },
     trace: "retain-on-failure"
   }
 });
