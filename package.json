@@ -1,0 +1,24 @@
+{
+  "name": "cj-font-fallback-fix",
+  "private": true,
+  "version": "0.8.37",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "build": "npm run typecheck && node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "test": "vitest run --exclude 'tests/sites/**'",
+    "test:sites": "npm run build && npm run typecheck:sites && playwright test --config playwright.sites.config.ts --grep-invert @corpus",
+    "test:corpus": "npm run build && npm run typecheck:sites && playwright test --config playwright.sites.config.ts --grep @corpus --retries=0",
+    "typecheck": "tsc --noEmit",
+    "typecheck:sites": "tsc --noEmit -p tests/sites/tsconfig.json"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/chrome": "^0.3.0",
+    "@types/node": "^26.6.2",
+    "typescript": "^6.0.0",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.0"
+  }
+}

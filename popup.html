@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="extensionName">CJ Font Fallback Fix</title>
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body class="popup-page">
+  <main class="panel popup-panel">
+    <header class="popup-header">
+      <img class="popup-brand-logo" src="icons/icon-active-128.png" alt="" width="64" height="64">
+      <div class="popup-header-copy">
+        <p class="eyebrow" data-i18n="extensionName">CJ Font Fallback Fix</p>
+        <div class="popup-status-row">
+          <h1 id="site" data-i18n="currentPage">Current page</h1>
+          <span id="version" class="version"></span>
+        </div>
+      </div>
+    </header>
+    <section id="unavailableState" class="unavailable-state" hidden>
+      <p data-i18n="unavailableHelp">Browser-protected and unsupported pages do not allow its page script to run.</p>
+    </section>
+    <dl id="statusGrid" class="status-grid">
+      <div><dt data-i18n="modeHeading">Mode</dt><dd id="mode">—</dd></div>
+      <div><dt data-i18n="htmlLang">HTML lang</dt><dd id="htmlLang">—</dd></div>
+      <div><dt id="languageLabel" data-i18n="detected">Detected</dt><dd id="detected">—</dd></div>
+      <div id="fontRow"><dt data-i18n="fallbackChoice">Applied fonts</dt><dd id="font">—</dd></div>
+      <div id="interventionRow"><dt id="interventionLabel" data-i18n="cssIntervention">CSS intervention</dt><dd id="intervention">—</dd></div>
+      <div id="managedRow"><dt data-i18n="managedElements">Managed elements</dt><dd id="changed">—</dd></div>
+    </dl>
+
+    <div id="siteControls">
+      <label class="override-label" for="override" data-i18n="thisSite">This site</label>
+      <select id="override">
+        <option value="auto" data-i18n="auto">Auto</option>
+        <option value="sc" data-i18n="simplifiedChinese">Simplified Chinese</option>
+        <option value="tc" data-i18n="traditionalChinese">Traditional Chinese</option>
+        <option value="jp" data-i18n="japanese">Japanese</option>
+        <option value="off" data-i18n="disabled">Disabled</option>
+      </select>
+    </div>
+    <p id="message" class="message" role="status"></p>
+    <button id="settings" class="secondary" type="button" data-i18n="settingsTitle">Settings</button>
+  </main>
+  <script type="module" src="/src/popup/main.ts"></script>
+</body>
+</html>

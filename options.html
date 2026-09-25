@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="settingsPageTitle">CJ Font Fallback Fix settings</title>
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body class="options-page">
+  <main class="panel options-panel">
+    <header>
+      <p class="eyebrow" data-i18n="extensionName">CJ Font Fallback Fix</p>
+      <h1 data-i18n="settingsTitle">Settings</h1>
+      <p class="subtitle" data-i18n="settingsSubtitle">Choose fonts for Simplified Chinese, Traditional Chinese, and Japanese, and control how page language is detected.</p>
+    </header>
+
+    <div id="settingsForm">
+      <fieldset class="compact-fieldset">
+        <legend data-i18n="modeHeading">Mode</legend>
+        <label class="check"><input id="simpleMode" type="checkbox"> <span data-i18n="simpleModeLabel">Simple mode: set the page language only</span></label>
+        <small class="check-help" data-i18n="simpleModeHelp">When a page opens, detect its language and set its lang so the browser can choose a suitable font. Later content changes are not rechecked.</small>
+        <p id="simpleModeNotice" class="mode-notice" role="status" hidden data-i18n="simpleModeNotice">Simple mode uses browser and operating system fonts. To choose fonts yourself, turn off Simple mode.</p>
+      </fieldset>
+
+      <section id="fontSettings" class="font-settings" aria-labelledby="fontSettingsHeading">
+        <h2 id="fontSettingsHeading" data-i18n="regionalFonts">Font choices</h2>
+        <p id="fontWarning" class="settings-warning" role="status" hidden data-i18n="fontWarning">No Sans font is selected. Choose an installed Sans font for at least one language.</p>
+        <div class="font-choice-grid">
+          <div class="font-choice">
+            <h3 data-i18n="simplifiedChinese">Simplified Chinese</h3>
+            <label for="fontSC" data-i18n="sans">Sans</label>
+            <select id="fontSC" name="fontSC" disabled></select>
+            <p id="previewSC" class="font-preview" lang="zh-CN">春宵苦短少女前进吧</p>
+            <label for="fontSCSerif" data-i18n="serif">Serif</label>
+            <select id="fontSCSerif" name="fontSCSerif" disabled></select>
+            <p id="previewSCSerif" class="font-preview serif-preview" lang="zh-CN">春宵苦短少女前进吧</p>
+          </div>
+          <div class="font-choice">
+            <h3 data-i18n="traditionalChinese">Traditional Chinese</h3>
+            <label for="fontTC" data-i18n="sans">Sans</label>
+            <select id="fontTC" name="fontTC" disabled></select>
+            <p id="previewTC" class="font-preview" lang="zh-TW">春宵苦短少女前進吧</p>
+            <label for="fontTCSerif" data-i18n="serif">Serif</label>
+            <select id="fontTCSerif" name="fontTCSerif" disabled></select>
+            <p id="previewTCSerif" class="font-preview serif-preview" lang="zh-TW">春宵苦短少女前進吧</p>
+          </div>
+          <div class="font-choice">
+            <h3 data-i18n="japanese">Japanese</h3>
+            <label for="fontJP" data-i18n="sans">Sans</label>
+            <select id="fontJP" name="fontJP" disabled></select>
+            <p id="previewJP" class="font-preview" lang="ja">夜は短し歩けよ乙女</p>
+            <label for="fontJPSerif" data-i18n="serif">Serif</label>
+            <select id="fontJPSerif" name="fontJPSerif" disabled></select>
+            <p id="previewJPSerif" class="font-preview serif-preview" lang="ja">夜は短し歩けよ乙女</p>
+          </div>
+        </div>
+      </section>
+
+      <label class="compact-field">
+        <span data-i18n="defaultChineseVariant">Default Chinese variant</span>
+        <select id="defaultChinese" name="defaultChinese">
+          <option value="sc" data-i18n="simplifiedChinese">Simplified Chinese</option>
+          <option value="tc" data-i18n="traditionalChinese">Traditional Chinese</option>
+        </select>
+        <small data-i18n="defaultChineseHelp">Used when the extension cannot determine whether the page's Chinese text is Simplified or Traditional.</small>
+      </label>
+
+      <fieldset>
+        <legend data-i18n="detectionHeading">Detection</legend>
+        <label class="check"><input id="trustCjkLang" type="checkbox"> <span data-i18n="trustCjkLang">Trust specific Chinese and Japanese language declarations</span></label>
+        <small class="check-help" data-i18n="trustCjkLangHelp">When content has lang=zh-CN, zh-TW, zh-HK, or ja, use the browser's font choice and leave that content's fonts unchanged.</small>
+        <div id="advancedDetection">
+          <label class="check"><input id="preserveWebFonts" type="checkbox"> <span data-i18n="preserveWebFonts">Keep suitable Chinese/Japanese fonts loaded by the website</span></label>
+          <label class="check"><input id="preserveKnownCjk" type="checkbox"> <span data-i18n="preserveKnownCjk">Keep suitable installed Chinese/Japanese fonts named by the website</span></label>
+          <label class="check"><input id="dynamicDetection" type="checkbox"> <span data-i18n="dynamicDetection">Watch and re-detect dynamic pages</span></label>
+          <small class="check-help" data-i18n="dynamicDetectionHelp">When disabled, the initial result stays fixed.</small>
+          <label class="check"><input id="mixedLanguageDetection" type="checkbox"> <span data-i18n="mixedLanguageDetection">Detect clearly separated Chinese and Japanese text blocks (experimental)</span></label>
+          <small class="check-help" data-i18n="mixedLanguageDetectionHelp">Only activates on pages with substantial amounts of both languages and no explicit CJK lang.</small>
+        </div>
+
+        <section class="site-overrides-section" aria-labelledby="siteOverridesTitle">
+          <button id="toggleSiteOverrides" class="secondary compact" type="button" aria-expanded="false" aria-controls="siteOverridesPanel" data-i18n="manageSiteOverrides">Manage site language settings</button>
+          <div id="siteOverridesPanel" class="site-overrides-panel" hidden>
+            <h2 id="siteOverridesTitle" data-i18n="siteOverridesTitle">Site language settings</h2>
+            <p class="section-help" data-i18n="siteOverridesHelp">View and edit languages selected for individual websites. These settings are not changed by Restore defaults.</p>
+            <p id="noSiteOverrides" class="empty-state" data-i18n="noSiteOverrides">No website-specific language settings.</p>
+            <div id="siteOverrideList" class="site-override-list"></div>
+
+            <form id="addSiteOverride" class="add-site-override">
+              <label>
+                <span data-i18n="website">Website</span>
+                <input id="newSiteHostname" type="text" inputmode="url" autocomplete="off" placeholder="example.com" required>
+              </label>
+              <label>
+                <span data-i18n="language">Language</span>
+                <select id="newSiteVariant">
+                  <option value="sc" data-i18n="simplifiedChinese">Simplified Chinese</option>
+                  <option value="tc" data-i18n="traditionalChinese">Traditional Chinese</option>
+                  <option value="jp" data-i18n="japanese">Japanese</option>
+                  <option value="off" data-i18n="disabled">Disabled</option>
+                </select>
+              </label>
+              <button class="compact" type="submit" data-i18n="addSite">Add website</button>
+            </form>
+
+            <div class="site-overrides-footer">
+              <button id="clearSiteOverrides" class="secondary compact danger" type="button" data-i18n="clearAllSiteOverrides">Delete all site settings</button>
+              <span id="siteOverrideStatus" role="status"></span>
+            </div>
+          </div>
+        </section>
+      </fieldset>
+
+      <div class="actions">
+        <button id="resetSettings" class="secondary compact" type="button" data-i18n="restoreDefaults">Restore defaults</button>
+        <span id="status" role="status"></span>
+      </div>
+    </div>
+
+  </main>
+  <script type="module" src="/src/options/main.ts"></script>
+</body>
+</html>
