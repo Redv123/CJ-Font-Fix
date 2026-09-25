@@ -72,7 +72,7 @@ npm run build
 
 `npm test` 运行本地单元测试。`npm run test:sites` 会在真实 Chromium 中运行本地 SPA 样本和若干在线网站测试；完整网站测试需要联网，也可能受网站变化影响。可选的 `npm run test:corpus` 使用 `CJ_FLORES_DIR` 指向本机的 FLORES-200 数据；语料不会提交到仓库，也不会打包进扩展。准备方法和测试边界见[测试说明](docs/testing.md)。`npm run build` 会先检查 TypeScript，再把扩展构建到 `dist`。
 
-GitHub 使用 [Build and release](.github/workflows/release.yml) 从对应版本的源码生成发布附件。把版本修改提交到 `main` 后，在 Actions 页面选择该流程并从 `main` 运行；它会核对 `package.json` 和 `manifest.json` 的版本，执行 `npm ci`、单元测试、类型检查和构建，最后创建 `v<版本>` 标签及附带 ZIP 的 Release。推送匹配的版本标签也会触发同一流程。不要先手工创建空的 Release；流程会在构建通过后创建。线上网站测试和可选语料测试不在这个发布流程中运行。
+GitHub 使用 [Build and release](.github/workflows/release.yml) 从对应版本的源码生成发布附件。发布前先写好 `docs/releases/v<版本>.md`，流程会使用这份说明，不自动生成更新日志。把版本修改和发布说明提交到 `main` 后，在 Actions 页面选择该流程并从 `main` 运行；它会核对 `package.json` 和 `manifest.json` 的版本，执行 `npm ci`、单元测试、类型检查和构建，最后创建 `v<版本>` 标签及附带 ZIP 的 Release。推送匹配的版本标签也会触发同一流程。不要先手工创建空的 Release；流程会在构建通过后创建。线上网站测试和可选语料测试不在这个发布流程中运行。
 
 扩展无法读取浏览器最终为**每个字形**使用的实际字体，只能根据网页 CSS、字体信息和本机字体可用性作判断。少量共用汉字无法可靠区分地区；实验性混排也不会覆盖所有行内结构。开放式 Shadow DOM 在被发现后可以处理，封闭式 Shadow DOM 无法检查。
 

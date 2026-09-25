@@ -46,6 +46,11 @@ jobs:
             exit 1
           }
           tag="v$version"
+          notes="docs/releases/$tag.md"
+          test -f "$notes" || {
+            echo "Missing release notes: $notes" >&2
+            exit 1
+          }
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             [[ "$GITHUB_REF_NAME" == "$tag" ]] || {
               echo "Tag $GITHUB_REF_NAME does not match $tag" >&2
@@ -73,19 +78,21 @@ jobs:
           unzip -t "$archive"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "notes=$notes" >> "$GITHUB_OUTPUT"
       - name: Publish GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.package.outputs.tag }}
           RELEASE_ARCHIVE: ${{ steps.package.outputs.archive }}
+          RELEASE_NOTES: ${{ steps.package.outputs.notes }}
         run: |
           set -euo pipefail
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             gh release create "$RELEASE_TAG" "$RELEASE_ARCHIVE" \
               --repo "$GITHUB_REPOSITORY" --verify-tag \
-              --title "$RELEASE_TAG" --generate-notes \
-              --notes "Download the attached extension ZIP, not GitHub's Source code archive."
+              --title "CJ Font Fallback Fix $RELEASE_TAG" \
+              --notes-file "$RELEASE_NOTES"
           else
             if git ls-remote --tags origin "refs/tags/$RELEASE_TAG" | grep -q .; then
               echo "Tag $RELEASE_TAG already exists; refusing to attach a build from a different commit" >&2
@@ -93,6 +100,6 @@ jobs:
             fi
             gh release create "$RELEASE_TAG" "$RELEASE_ARCHIVE" \
               --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title "$RELEASE_TAG" --generate-notes \
-              --notes "Download the attached extension ZIP, not GitHub's Source code archive."
+              --title "CJ Font Fallback Fix $RELEASE_TAG" \
+              --notes-file "$RELEASE_NOTES"
           fi
