@@ -26,20 +26,11 @@ export class ElementLanguage {
     if (!this.settings.trustCjkLang) return false;
     const owner = closestComposed(element, "[lang]");
     if (!owner) return false;
-    const language = (owner.getAttribute("lang") || "").trim();
-
-    // A descendant language declaration is deliberate, even when its BCP 47
-    // tag is outside the three regional variants supported by this extension.
-    // The browser must retain control of that explicitly annotated content.
-    if (owner !== document.documentElement) return Boolean(language);
-
-    const variant = langToVariant(language);
-    if (variant === "sc" || variant === "tc" || variant === "jp") return true;
-    if (variant === "zh") {
-      const detected = this.classifiedVariantFor(owner);
-      return detected === this.settings.defaultChinese;
-    }
-    return false;
+    // Only declarations that identify a supported region are sufficient to
+    // leave font selection to the browser. Bare zh and unrelated languages
+    // still need the usual CJK detection and font pipeline.
+    const variant = langToVariant(owner.getAttribute("lang") || "");
+    return variant === "sc" || variant === "tc" || variant === "jp";
   }
 
   private classifiedVariantFor(owner: Element): Variant | null {

@@ -24,8 +24,8 @@ afterEach(() => {
 });
 
 describe("browser-owned language contexts", () => {
-  it.each(["cdo", "gan", "hak", "wuu", "nan", "yue", "ja", "zh-Hant"])(
-    "leaves an explicit descendant lang=%s to the browser",
+  it.each(["ja", "ja-JP", "zh-CN", "zh-Hans", "zh-TW", "zh-HK", "zh-Hant"])(
+    "leaves a specific CJK descendant lang=%s to the browser",
     (language) => {
       const root = languageOwner("zh-Hans-CN");
       vi.stubGlobal("document", { documentElement: root });
@@ -38,6 +38,25 @@ describe("browser-owned language contexts", () => {
 
   it("does not trust an unrelated language declared only on the page root", () => {
     const root = languageOwner("en");
+    vi.stubGlobal("document", { documentElement: root });
+    const resolver = new ElementLanguage("sc", settings(), () => "sc");
+
+    expect(resolver.browserHandlesLanguageFor(elementInside(root))).toBe(false);
+  });
+
+  it.each(["en", "en-US", "en_GB", "fr", "cdo", "gan", "hak", "wuu", "nan", "yue", "zh", "ko"])(
+    "does not trust a non-specific-CJK descendant lang=%s", (language) => {
+      const root = languageOwner("en");
+      vi.stubGlobal("document", { documentElement: root });
+      const owner = languageOwner(language);
+      const resolver = new ElementLanguage("sc", settings(), () => "sc");
+
+      expect(resolver.browserHandlesLanguageFor(elementInside(owner))).toBe(false);
+    }
+  );
+
+  it("does not trust bare root lang=zh", () => {
+    const root = languageOwner("zh");
     vi.stubGlobal("document", { documentElement: root });
     const resolver = new ElementLanguage("sc", settings(), () => "sc");
 

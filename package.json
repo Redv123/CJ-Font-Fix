@@ -1,7 +1,7 @@
 {
   "name": "cj-font-fallback-fix",
   "private": true,
-  "version": "0.8.38",
+  "version": "0.8.39",
   "license": "GPL-3.0-only",
   "type": "module",
   "scripts": {

@@ -56,7 +56,6 @@ function startContentApplication(): void {
     managedStyles,
     fontSupport,
     () => settings,
-    () => openShadowRoots,
     classifyChinese,
     localEvidence
   );
@@ -245,6 +244,15 @@ function startContentApplication(): void {
     pageObserver.configure();
     requestFullScan(true);
     await run();
+  });
+
+  // An SPA can restore already-existing content on Back without changing any
+  // text nodes observed by PageObserver. History traversal is therefore a
+  // separate reason to reconsider the page sample and its applied styles.
+  window.addEventListener("popstate", () => {
+    if (settings.simpleMode || !settings.dynamicDetection) return;
+    requestFullScan(true);
+    requestRunForQueuedWork();
   });
 
   (async () => {

@@ -40,6 +40,74 @@ test.afterAll(async () => {
   if (profileDirectory) await rm(profileDirectory, { recursive: true, force: true });
 });
 
+test("does not trust an English body lang for Chinese content", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({
+      fontSC: "CJ Test Sans",
+      defaultChinese: "sc",
+      preserveWebFonts: false,
+      preserveKnownCjk: false,
+      simpleMode: false,
+      trustCjkLang: true,
+      siteOverrides: {}
+    });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/english-body", (route) => route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<html lang="en"><head><title>中文字体测试</title><style>
+        p { font-family: "Site Latin", sans-serif; }
+      </style></head><body lang="en"><main><p id="chinese">${CHINESE.repeat(3)}</p></main></body></html>`
+    }));
+    await page.goto("https://fixture.test/english-body", { waitUntil: "domcontentloaded" });
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).pageVariant).toBe("sc");
+    await expect.poll(async () => (await currentStatus()).changedElements).toBeGreaterThan(0);
+    await expect.poll(() => page.locator("#chinese").evaluate((element) =>
+      getComputedStyle(element).fontFamily
+    )).toContain("CJ Test Sans");
+  } finally {
+    await page.close();
+  }
+});
+
+test("does not skip font repair for bare root lang=zh", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({
+      fontSC: "CJ Test Sans",
+      defaultChinese: "sc",
+      preserveWebFonts: false,
+      preserveKnownCjk: false,
+      simpleMode: false,
+      trustCjkLang: true,
+      siteOverrides: {}
+    });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/bare-zh", (route) => route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<html lang="zh"><head><title>中文字体测试</title><style>
+        p { font-family: "Site Latin", sans-serif; }
+      </style></head><body><main><p id="chinese">${CHINESE.repeat(3)}</p></main></body></html>`
+    }));
+    await page.goto("https://fixture.test/bare-zh", { waitUntil: "domcontentloaded" });
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).pageVariant).toBe("sc");
+    await expect.poll(async () => (await currentStatus()).changedElements).toBeGreaterThan(0);
+    await expect.poll(() => page.locator("#chinese").evaluate((element) =>
+      getComputedStyle(element).fontFamily
+    )).toContain("CJ Test Sans");
+  } finally {
+    await page.close();
+  }
+});
+
 test("trusts a specific root CJK lang without inspecting nested content", async () => {
   await worker.evaluate(async () => {
     await chrome.storage.sync.clear();
@@ -120,6 +188,58 @@ test("removes mixed-language wrappers when an SPA becomes English-only", async (
     await expect.poll(async () => (await currentStatus()).pageVariant).toBeNull();
     await expect.poll(async () => (await currentStatus()).changedElements).toBe(0);
     await expect(wrappers).toHaveCount(0);
+  } finally {
+    await page.close();
+  }
+});
+
+test("redetects Japanese content after an in-document history return", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({
+      fontJP: "CJ Test Japanese",
+      preserveWebFonts: false,
+      preserveKnownCjk: false,
+      dynamicDetection: true,
+      simpleMode: false,
+      trustCjkLang: true,
+      siteOverrides: {}
+    });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/videos", (route) => route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<html lang="en"><head><title>日本語の動画</title></head><body>
+        <div id="videos" role="main"><p id="japanese">${JAPANESE.repeat(3)}</p></div>
+        <div id="home">English home page</div>
+        <script>
+          addEventListener("popstate", () => {
+            document.querySelector("#home").removeAttribute("role");
+            document.querySelector("#videos").setAttribute("role", "main");
+          });
+        </script>
+      </body></html>`
+    }));
+    await page.goto("https://fixture.test/videos", { waitUntil: "domcontentloaded" });
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).pageVariant).toBe("jp");
+
+    await page.evaluate(() => {
+      document.querySelector("#videos")?.removeAttribute("role");
+      document.querySelector("#home")?.setAttribute("role", "main");
+      history.pushState({}, "", "/home");
+      document.title = "English home page";
+    });
+    await expect.poll(async () => (await currentStatus()).reason).toBe("No CJK text");
+
+    await page.evaluate(() => history.back());
+    await page.waitForURL("https://fixture.test/videos");
+    await expect.poll(async () => (await currentStatus()).pageVariant).toBe("jp");
+    await expect.poll(() => page.locator("#japanese").evaluate((element) =>
+      getComputedStyle(element).fontFamily
+    )).toContain("CJ Test Japanese");
   } finally {
     await page.close();
   }

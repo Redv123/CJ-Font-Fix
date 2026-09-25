@@ -27,22 +27,23 @@ function detectorWithSample(sample: string): PageLanguageDetector {
   return detector;
 }
 
-function resultListEnvironment() {
+function articleListEnvironment(secondText: string) {
+  const firstText = "First article in another language";
   const results = { tagName: "OL", parentElement: null, isConnected: true,
     contains: (node: unknown) => node === result };
-  const adItem = { tagName: "LI", parentElement: results, isConnected: true,
+  const firstItem = { tagName: "LI", parentElement: results, isConnected: true,
     contains: () => false };
-  const resultItem = { tagName: "LI", parentElement: results, isConnected: true };
-  const ad = { tagName: "ARTICLE", parentElement: adItem, isConnected: true };
-  const result = { tagName: "ARTICLE", parentElement: resultItem, isConnected: true };
-  const articles: object[] = [ad];
+  const secondItem = { tagName: "LI", parentElement: results, isConnected: true };
+  const first = { tagName: "ARTICLE", parentElement: firstItem, isConnected: true };
+  const result = { tagName: "ARTICLE", parentElement: secondItem, isConnected: true };
+  const articles: object[] = [first];
   const textByRoot = new Map<object, string[]>([
-    [ad, ["Report Ad", "Köp Pokemon Kläder Online"]],
-    [results, ["Report Ad", "Köp Pokemon Kläder Online", "ポケモン公式サイト", "ポケモン図鑑"]]
+    [first, [firstText]],
+    [results, [firstText, secondText]]
   ]);
   vi.stubGlobal("NodeFilter", { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 });
   vi.stubGlobal("document", {
-    title: "ポケモン at DuckDuckGo",
+    title: "Search results",
     body: { tagName: "BODY", isConnected: true },
     querySelector: (selector: string) => selector === "article" ? articles[0] : null,
     querySelectorAll: (selector: string) => selector === "article" ? articles : [],
@@ -73,28 +74,30 @@ afterEach(() => {
 });
 
 describe("page language decision order", () => {
-  it("samples the result list rather than only its first ad article", () => {
-    const { articles, result } = resultListEnvironment();
-    articles.push(result);
+  it.each(["日本語の検索結果", "繁體中文搜尋結果"])(
+    "samples a later article regardless of its text: %s", (secondText) => {
+      const { articles, result } = articleListEnvironment(secondText);
+      articles.push(result);
 
-    const sample = new PageLanguageDetector().collectSample();
+      const sample = new PageLanguageDetector().collectSample();
 
-    expect(sample).toContain("ポケモン公式サイト");
-    expect(sample).toContain("ポケモン図鑑");
-  });
+      expect(sample).toContain(secondText);
+    }
+  );
 
   it("switches from a lone article to its result list when another article arrives", () => {
-    const { articles, result } = resultListEnvironment();
+    const secondText = "第二篇文章";
+    const { articles, result } = articleListEnvironment(secondText);
     const detector = new PageLanguageDetector();
-    expect(detector.collectSample()).not.toContain("ポケモン図鑑");
+    expect(detector.collectSample()).not.toContain(secondText);
 
     articles.push(result);
 
-    expect(detector.collectSample()).toContain("ポケモン図鑑");
+    expect(detector.collectSample()).toContain(secondText);
   });
 
   it("treats an added result article as a change to the sampled region", () => {
-    const { result } = resultListEnvironment();
+    const { result } = articleListEnvironment("第二篇文章");
     const detector = new PageLanguageDetector();
     detector.collectSample();
     vi.stubGlobal("Node", { TEXT_NODE: 3 });

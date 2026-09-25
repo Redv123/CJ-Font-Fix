@@ -40,7 +40,6 @@ export class FallbackController {
     private readonly managedStyles: ManagedStyles,
     private readonly fontSupport: FontSupport,
     private readonly getSettings: () => Settings,
-    private readonly getOpenShadowRoots: () => ReadonlySet<ShadowRoot>,
     private readonly classifyChinese: (text: string) => "sc" | "tc",
     analyzeLocalEvidence: (text: string) => CjkEvidence
   ) {
@@ -84,19 +83,6 @@ export class FallbackController {
       this.managedStyles.restoreAll();
       this.managedStyles.rules.prune();
       return { count: 0, variants: [], fonts: [] };
-    }
-
-    // Bare zh still needs SC/TC classification. Keep its narrower fast path
-    // only when the classified result matches the browser's configured default.
-    if (fullScan && !forceOverride && settings.trustCjkLang && declaredRoot === "zh" &&
-      pageVariant === settings.defaultChinese) {
-      const hasNestedLang = document.body?.hasAttribute("lang") || document.querySelector("body [lang]") ||
-        Array.from(this.getOpenShadowRoots()).some((root) => root.host.isConnected && root.querySelector("[lang]"));
-      if (!hasNestedLang) {
-        this.managedStyles.restoreAll();
-        this.managedStyles.rules.prune();
-        return { count: 0, variants: [], fonts: [] };
-      }
     }
 
     const candidates = this.collectCandidates(fullScan, roots, elements);
