@@ -57,7 +57,7 @@ The icon reflects **use on the current page**: the book opens when Advanced mode
 3. Click **Load unpacked** and select the extracted folder.
 4. Open the extension's **Settings** to check or adjust the font choices.
 
-To build from source, run `npm install` and `npm run build`, then load the generated `dist` directory. The release ZIP is already built.
+To build from source, run `npm ci` and `npm run build`, then load the generated `dist` directory. For a GitHub Release, download the attached `cj-font-fallback-fix-<version>.zip`; GitHub's automatically generated **Source code (zip)** is source only, not the built extension.
 
 ## Development and limits
 
@@ -72,10 +72,12 @@ npm run build
 
 `npm test` runs local unit tests. `npm run test:sites` checks a local SPA fixture and several live sites in Chromium; the full site suite needs internet access and can be affected by site changes. The optional `npm run test:corpus` uses a locally supplied FLORES-200 archive via `CJ_FLORES_DIR`; its text is not committed or bundled. See the [testing notes](docs/testing.md) for setup and limits. `npm run build` checks TypeScript and produces a loadable extension in `dist`.
 
+GitHub builds release assets from the tagged source via [Build and release](.github/workflows/release.yml). After committing a version update to `main`, run that workflow from the Actions tab on `main`; it checks the package and manifest versions, runs `npm ci`, unit tests and type checks, builds the extension, then creates the matching `v<version>` tag and Release with the ZIP attached. Pushing a matching version tag also triggers it. Do not create an empty Release first: the workflow creates the Release after the build passes. Live-site and optional corpus tests are not part of this release workflow.
+
 The extension cannot ask Chromium which physical font rendered **each glyph**. It relies on the page's CSS, font metadata, and local availability instead. A few shared Han characters cannot reliably identify a region, and the experimental mixed-language option does not cover every inline layout. Discovered open shadow roots can be handled; closed shadow roots cannot be inspected.
 
 ## License
 
 The source code, original icon artwork, and documentation text are licensed under [GNU GPLv3](LICENSE) (`GPL-3.0-only`). The [comparison screenshot](docs/images/bold-chinese-before-after.png) depicts a third-party website and is **not** covered by that license; this project does not grant rights to reuse the website content shown in it.
 
-The built extension in `dist` contains the files needed to run it and a copy of the license, but not the READMEs, development docs, or comparison screenshot. A published binary release should point to the matching source revision.
+The built extension in `dist` contains the files needed to run it and a copy of the license, but not the READMEs, development docs, or comparison screenshot. The release workflow tags the exact source revision used for its ZIP.

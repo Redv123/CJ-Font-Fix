@@ -57,7 +57,7 @@ Chrome 在 Linux 中，如果网页没有用 `lang` 声明语言，也没有在 
 3. 点击**加载已解压的扩展程序**，选择解压后的目录。
 4. 打开扩展的**设置**，检查或调整字体选择。
 
-从源码构建时，运行 `npm install` 和 `npm run build`，然后加载生成的 `dist` 目录。发布版 ZIP 已包含构建结果。
+从源码构建时，运行 `npm ci` 和 `npm run build`，然后加载生成的 `dist` 目录。GitHub Release 中应下载附件里的 `cj-font-fallback-fix-<版本>.zip`；GitHub 自动生成的 **Source code (zip)** 只有源码，不是构建好的扩展。
 
 ## 开发与限制
 
@@ -72,10 +72,12 @@ npm run build
 
 `npm test` 运行本地单元测试。`npm run test:sites` 会在真实 Chromium 中运行本地 SPA 样本和若干在线网站测试；完整网站测试需要联网，也可能受网站变化影响。可选的 `npm run test:corpus` 使用 `CJ_FLORES_DIR` 指向本机的 FLORES-200 数据；语料不会提交到仓库，也不会打包进扩展。准备方法和测试边界见[测试说明](docs/testing.md)。`npm run build` 会先检查 TypeScript，再把扩展构建到 `dist`。
 
+GitHub 使用 [Build and release](.github/workflows/release.yml) 从对应版本的源码生成发布附件。把版本修改提交到 `main` 后，在 Actions 页面选择该流程并从 `main` 运行；它会核对 `package.json` 和 `manifest.json` 的版本，执行 `npm ci`、单元测试、类型检查和构建，最后创建 `v<版本>` 标签及附带 ZIP 的 Release。推送匹配的版本标签也会触发同一流程。不要先手工创建空的 Release；流程会在构建通过后创建。线上网站测试和可选语料测试不在这个发布流程中运行。
+
 扩展无法读取浏览器最终为**每个字形**使用的实际字体，只能根据网页 CSS、字体信息和本机字体可用性作判断。少量共用汉字无法可靠区分地区；实验性混排也不会覆盖所有行内结构。开放式 Shadow DOM 在被发现后可以处理，封闭式 Shadow DOM 无法检查。
 
 ## 许可证
 
 源码、原创图标和文档文字采用 [GNU GPLv3](LICENSE)（`GPL-3.0-only`）授权。[效果对比截图](docs/images/bold-chinese-before-after.png)展示了第三方网站，**不在上述授权范围内**；本项目也不授予转载截图中网站内容的权利。
 
-构建生成的 `dist` 只包含扩展运行所需文件及许可证，不包含 README、开发文档或效果对比截图。发布构建包时，应同时提供对应版本的源码。
+构建生成的 `dist` 只包含扩展运行所需文件及许可证，不包含 README、开发文档或效果对比截图。发布流程会为 ZIP 所对应的源码版本创建标签。
