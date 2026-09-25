@@ -57,7 +57,7 @@ Chrome 在 Linux 中，如果网页没有用 `lang` 声明语言，也没有在 
 3. 点击**加载已解压的扩展程序**，选择解压后的目录。
 4. 打开扩展的**设置**，检查或调整字体选择。
 
-从源码构建时，运行 `npm ci` 和 `npm run build`，然后加载生成的 `dist` 目录。GitHub Release 中应下载附件里的 `cj-font-fallback-fix-<版本>.zip`；GitHub 自动生成的 **Source code (zip)** 只有源码，不是构建好的扩展。
+从源码构建时，运行 `npm ci` 和 `npm run build`，然后加载生成的 `dist` 目录。
 
 ## 开发与限制
 

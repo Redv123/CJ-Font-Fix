@@ -57,7 +57,7 @@ The icon reflects **use on the current page**: the book opens when Advanced mode
 3. Click **Load unpacked** and select the extracted folder.
 4. Open the extension's **Settings** to check or adjust the font choices.
 
-To build from source, run `npm ci` and `npm run build`, then load the generated `dist` directory. For a GitHub Release, download the attached `cj-font-fallback-fix-<version>.zip`; GitHub's automatically generated **Source code (zip)** is source only, not the built extension.
+To build from source, run `npm ci` and `npm run build`, then load the generated `dist` directory.
 
 ## Development and limits
 
