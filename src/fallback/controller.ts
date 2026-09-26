@@ -89,7 +89,9 @@ export class FallbackController {
     this.mixedLanguage.prepare(candidates, fullScan, pageVariant, mixedEligible, [...roots, ...elements]);
     const elementLanguage = new ElementLanguage(pageVariant, settings, this.classifyChinese);
     const affected = this.managedStyles.affected(fullScan, roots, elements);
-    const entries = this.resolveEntries(candidates, affected, elementLanguage, pageVariant, forceOverride);
+    const entries = this.resolveEntries(
+      candidates, affected, elementLanguage, pageVariant, forceOverride, this.mixedLanguage.isActive
+    );
 
     if (entries.length) this.fontSupport.refreshCustomFonts();
 
@@ -125,7 +127,8 @@ export class FallbackController {
     affected: Set<HTMLElement>,
     elementLanguage: ElementLanguage,
     pageVariant: Variant,
-    forceOverride: boolean
+    forceOverride: boolean,
+    mixedActive: boolean
   ): PendingEntry[] {
     const entries: PendingEntry[] = [];
     for (const element of candidates) {
@@ -137,7 +140,10 @@ export class FallbackController {
         continue;
       }
 
-      const variant = forceOverride ? pageVariant : (
+      // Without an active mixed-page decision, every element needing CSS uses
+      // the single page variant. A bare descendant lang=zh does not silently
+      // turn the ordinary path into per-element SC/TC font selection.
+      const variant = forceOverride || !mixedActive ? pageVariant : (
         elementLanguage.explicitVariantFor(element) ||
         this.mixedLanguage.variantFor(element) ||
         pageVariant

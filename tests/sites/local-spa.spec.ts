@@ -74,6 +74,45 @@ test("does not trust an English body lang for Chinese content", async () => {
   }
 });
 
+test("uses only the page font when mixed detection is off despite bare zh descendants", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({
+      mixedLanguageDetection: false,
+      fontSC: "CJ Test Simplified",
+      fontTC: "CJ Test Traditional",
+      fontJP: "CJ Test Japanese",
+      trustCjkLang: true,
+      preserveWebFonts: false,
+      preserveKnownCjk: false,
+      simpleMode: false,
+      siteOverrides: {}
+    });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/lyrics", (route) => route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<html lang="en"><head><title>日本語の歌詞</title></head><body>
+        <div id="mw-content-text" lang="zh">
+          <p>${JAPANESE.repeat(6)}</p>
+          <p id="translation">${CHINESE.repeat(2)}</p>
+        </div>
+        <div id="catlinks">Categories: <a>日文歌词</a> <a>有翻译的歌词</a></div>
+      </body></html>`
+    }));
+    await page.goto("https://fixture.test/lyrics", { waitUntil: "domcontentloaded" });
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).pageVariant).toBe("jp");
+    await expect.poll(async () => (await currentStatus()).fallbackChoice).toBe("CJ Test Japanese");
+    await expect(page.locator("[data-cjk-fallback-local]")).toHaveCount(0);
+    await expect(page.locator("#translation")).toHaveAttribute("data-cjk-fallback-fixed", "jp");
+  } finally {
+    await page.close();
+  }
+});
+
 test("does not skip font repair for bare root lang=zh", async () => {
   await worker.evaluate(async () => {
     await chrome.storage.sync.clear();

@@ -43,6 +43,10 @@ export class MixedLanguage {
     return this.variants;
   }
 
+  get isActive(): boolean {
+    return this.pageActive;
+  }
+
   variantFor(element: HTMLElement): Variant | null {
     const cached = this.localVariants.get(element);
     if (cached) return cached;
