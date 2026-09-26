@@ -54,6 +54,21 @@ export function isFangsongFamily(family: string): boolean {
   return /fang[\s-]?song|仿宋|fandol[\s-]?fang/i.test(normalizeFamily(family));
 }
 
+/** An existing choice is useful only before generic and wrong-region fonts. */
+export function hasEffectiveFallback(
+  families: readonly string[], fallback: string, desiredVariant?: Variant
+): boolean {
+  const existingIndex = families.findIndex((family) => family.toLowerCase() === fallback.toLowerCase());
+  if (existingIndex < 0) return false;
+  const firstGeneric = families.findIndex(isGenericFamily);
+  if (firstGeneric >= 0 && existingIndex > firstGeneric) return false;
+  return !desiredVariant || !families.slice(0, existingIndex).some((family) => {
+    const variant = regionalVariantForFamily(family);
+    return (variant !== null && variant !== desiredVariant) ||
+      (desiredVariant === "jp" && isFangsongFamily(family));
+  });
+}
+
 /**
  * Recognize a region from a known family name, not from its glyph coverage.
  * Null also covers Latin and region-neutral CJK families, which must not be
@@ -91,8 +106,9 @@ export function regionalVariantForFamily(family: string): Variant | null {
  *
  * excludedFamilies removes a fallback inherited from an ancestor that the
  * extension previously styled for another variant. An already-present
- * selected family returns the original stack unchanged; this is idempotence,
- * not a check that the browser will render every glyph from that family.
+ * selected family is left alone only when it precedes both the first generic
+ * and every conflicting regional family. Presence alone does not make it
+ * reachable for CJK glyphs or give it the intended regional precedence.
  */
 export function composeFontFamily(
   baseFamily: string,
@@ -101,9 +117,13 @@ export function composeFontFamily(
   excludedFamilies: readonly string[] = []
 ): string {
   const excluded = new Set(excludedFamilies.map((family) => family.toLowerCase()));
-  const families = parseFamilies(baseFamily)
+  let families = parseFamilies(baseFamily)
     .filter((family) => !excluded.has(family.toLowerCase()));
-  if (families.some((family) => family.toLowerCase() === fallback.toLowerCase())) return baseFamily;
+  if (hasEffectiveFallback(families, fallback, desiredVariant)) return baseFamily;
+  if (families.some((family) => family.toLowerCase() === fallback.toLowerCase())) {
+    // Reinsert one copy at its effective position instead of appending another.
+    families = families.filter((family) => family.toLowerCase() !== fallback.toLowerCase());
+  }
   const isRegionalForOrdering = (family: string): boolean =>
     regionalVariantForFamily(family) !== null ||
     (desiredVariant === "jp" && isFangsongFamily(family));

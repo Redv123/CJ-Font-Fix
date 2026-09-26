@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   composeFontFamily,
+  hasEffectiveFallback,
   isGenericFamily,
   normalizeFamily,
   parseFamilies,
@@ -35,6 +36,34 @@ describe("font-family helpers", () => {
   it("does not add a family that is already present", () => {
     const stack = 'Roboto, "Noto Sans CJK JP", sans-serif';
     expect(composeFontFamily(stack, "Noto Sans CJK JP")).toBe(stack);
+  });
+
+  it("moves an existing Japanese choice ahead of a conflicting Chinese family", () => {
+    expect(composeFontFamily(
+      'Arial, "PingFang SC", "My Japanese Choice", sans-serif',
+      "My Japanese Choice", "jp"
+    )).toBe('"Arial", "My Japanese Choice", "PingFang SC", sans-serif');
+  });
+
+  it("distinguishes a selected font's presence from effective precedence", () => {
+    expect(hasEffectiveFallback(
+      parseFamilies('Arial, "PingFang SC", "My Japanese Choice", sans-serif'),
+      "My Japanese Choice", "jp"
+    )).toBe(false);
+    expect(hasEffectiveFallback(
+      parseFamilies('Arial, "My Japanese Choice", "PingFang SC", sans-serif'),
+      "My Japanese Choice", "jp"
+    )).toBe(true);
+    expect(hasEffectiveFallback(
+      parseFamilies('Arial, sans-serif, "My Japanese Choice"'),
+      "My Japanese Choice", "jp"
+    )).toBe(false);
+  });
+
+  it("moves an existing choice ahead of a generic that can hide it", () => {
+    expect(composeFontFamily(
+      'Arial, sans-serif, "Noto Sans CJK JP"', "Noto Sans CJK JP", "jp"
+    )).toBe('"Arial", "Noto Sans CJK JP", sans-serif');
   });
 
   it("detects an existing fallback without regard to case", () => {

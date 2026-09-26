@@ -1,4 +1,4 @@
-import { composeFontFamily, parseFamilies, usesSerifFallback } from "../fonts/font-family";
+import { composeFontFamily, hasEffectiveFallback, parseFamilies, usesSerifFallback } from "../fonts/font-family";
 import { collectCandidateElements, addCandidate, isInShadowTree } from "../page/candidate-scan";
 import { ElementLanguage } from "../page/element-language";
 import type { FontSupport } from "../fonts/font-support";
@@ -171,7 +171,7 @@ export class FallbackController {
         const families = parseFamilies(baseFamily);
         const fallback = this.fontForVariant(variant, usesSerifFallback(families), settings);
         const skip = !fallback ||
-          families.some((family) => family.toLowerCase() === fallback.toLowerCase()) ||
+          hasEffectiveFallback(families, fallback, variant) ||
           this.fontSupport.shouldPreserve(families, settings, variant);
         plan = { fallback, skip };
         plans.set(planKey, plan);
