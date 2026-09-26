@@ -1,6 +1,10 @@
 import { addCandidate, CJK_TEXT_RE, closestComposed } from "../page/candidate-scan";
 import { langToVariant } from "../language/tags";
-import { hasStrongChineseJapaneseMix, isKanaOrJapaneseHanOnly } from "../language/local-evidence";
+import {
+  hasStrongChineseJapaneseMix,
+  isShortJapaneseScriptSegment,
+  variantFromPrecedingEvidence
+} from "../language/local-evidence";
 import type { CjkEvidence } from "../language/local-evidence";
 import type { ManagedStyles } from "./managed-styles";
 import { findBangumiTitleRange } from "./site-rules/bangumi";
@@ -12,6 +16,8 @@ interface DirectSegment {
   text: string;
   evidence: CjkEvidence;
 }
+
+const ADJACENT_BLOCKS = "p, li, blockquote";
 
 /**
  * Owns the reversible DOM changes used by experimental mixed-language mode.
@@ -54,13 +60,16 @@ export class MixedLanguage {
     candidates: Set<HTMLElement>,
     fullScan: boolean,
     pageVariant: Variant,
-    eligible: boolean
+    eligible: boolean,
+    changedSources: readonly HTMLElement[] = []
   ): void {
     this.resetRunState();
     if (!eligible) {
       this.restoreAll();
       return;
     }
+
+    if (!fullScan) this.includeNeighborDependents(candidates, changedSources);
 
     // Candidate collection already visits the DOM. Reuse those direct text
     // nodes and cap the sample so the experiment does not add a body-wide pass.
@@ -90,6 +99,19 @@ export class MixedLanguage {
   private resetRunState(): void {
     this.localVariants = new WeakMap();
     this.variants = new Set();
+  }
+
+  /** Revisit only the next sibling whose decision may depend on changed text. */
+  private includeNeighborDependents(
+    candidates: Set<HTMLElement>,
+    changedSources: readonly HTMLElement[]
+  ): void {
+    for (const source of changedSources) {
+      if (source.hasAttribute(this.attribute)) addCandidate(candidates, source.parentElement);
+      if (!source.matches(ADJACENT_BLOCKS)) continue;
+      const next = source.nextElementSibling;
+      if (next?.tagName === source.tagName) addCandidate(candidates, next);
+    }
   }
 
   private hasExplicitCjkLang(element: Element): boolean {
@@ -134,7 +156,7 @@ export class MixedLanguage {
         continue;
       }
       const text = wrapper.textContent || "";
-      const variant = this.segmentVariant(text, this.analyze(text));
+      const variant = this.segmentVariant(text, this.analyze(text), wrapper);
       if (!variant || variant === pageVariant) {
         candidates.delete(wrapper);
         this.restoreWrapper(wrapper, candidates);
@@ -151,9 +173,11 @@ export class MixedLanguage {
     pageVariant: Variant
   ): void {
     const wholeSegments: DirectSegment[] = [];
+    const isBangumiHeading = location.hostname === "bangumi.tv" && element.matches("h2.subtitle");
     for (const segment of directSegments) {
       const node = segment.node;
-      if (!node || this.segmentVariant(segment.text, segment.evidence) !== "jp") {
+      if (!node || !isBangumiHeading ||
+          this.segmentVariant(segment.text, segment.evidence, node) !== "jp") {
         wholeSegments.push(segment);
         continue;
       }
@@ -161,8 +185,7 @@ export class MixedLanguage {
       // Bangumi places a Japanese work title between fixed Chinese labels in
       // one text node. This narrow structural rule avoids treating whitespace
       // as a general-purpose language boundary on unrelated sites.
-      const isBangumiHeading = location.hostname === "bangumi.tv" && element.matches("h2.subtitle");
-      const ranges = isBangumiHeading ? findBangumiTitleRange(node.nodeValue || "") : [];
+      const ranges = findBangumiTitleRange(node.nodeValue || "");
       if (!ranges.length) {
         wholeSegments.push(segment);
         continue;
@@ -180,7 +203,9 @@ export class MixedLanguage {
 
     if (wholeSegments.length === 1 && directSegments.length === 1) {
       const segment = wholeSegments[0];
-      const variant = segment && this.segmentVariant(segment.text, segment.evidence);
+      const variant = segment && this.segmentVariant(
+        segment.text, segment.evidence, segment.node || element
+      );
       if (variant && variant !== pageVariant) this.recordVariant(element, variant);
       return;
     }
@@ -188,7 +213,7 @@ export class MixedLanguage {
     // Multiple direct text nodes (commonly separated by <br>) can be styled
     // independently without changing the surrounding element or descendants.
     for (const segment of wholeSegments) {
-      const variant = this.segmentVariant(segment.text, segment.evidence);
+      const variant = this.segmentVariant(segment.text, segment.evidence, segment.node || element);
       const node = segment.node;
       if (!variant || variant === pageVariant || !node?.parentNode || node.parentElement !== element) continue;
       const wrapper = document.createElement("span");
@@ -199,11 +224,78 @@ export class MixedLanguage {
     }
   }
 
-  private segmentVariant(text: string, evidence: CjkEvidence): Variant | null {
+  private segmentVariant(text: string, evidence: CjkEvidence, anchor: Node): Variant | null {
     if (evidence.strongVariant) return evidence.strongVariant;
-    // This runs only after the mixed-page gate. A short segment consisting of
-    // kana and known Japanese-form Han may then override the page variant.
-    return isKanaOrJapaneseHanOnly(text, evidence) ? "jp" : null;
+    // This runs only after the mixed-page gate. Strong local script evidence
+    // may override the page variant for a short, independent segment.
+    if (isShortJapaneseScriptSegment(text, evidence)) return "jp";
+    const previous = this.precedingText(anchor);
+    if (!previous) return null;
+    const priorEvidence = this.analyze(previous);
+    const priorVariant = priorEvidence.strongVariant ||
+      (isShortJapaneseScriptSegment(previous, priorEvidence) ? "jp" : null);
+    return variantFromPrecedingEvidence(evidence, priorVariant);
+  }
+
+  /**
+   * Look back once within the same direct-text owner or to an immediately
+   * preceding peer paragraph. Other elements, explicit CJK lang, and large
+   * line gaps are boundaries. Never use a prior context-derived wrapper as
+   * evidence: that would let a mistaken choice propagate down the page.
+   */
+  private precedingText(anchor: Node): string | null {
+    let current = anchor;
+    for (let level = 0; level < 2; level++) {
+      let sibling = current.previousSibling;
+      let breaks = 0;
+      let checked = 0;
+      while (sibling && checked++ < 8) {
+        if (sibling.nodeType === Node.TEXT_NODE) {
+          const text = (sibling.nodeValue || "").replace(/\s+/g, " ").trim().slice(0, 500);
+          if (!text) {
+            sibling = sibling.previousSibling;
+            continue;
+          }
+          return CJK_TEXT_RE.test(text) ? text : null;
+        }
+        if (sibling instanceof HTMLBRElement) {
+          if (++breaks > 2) return null;
+          sibling = sibling.previousSibling;
+          continue;
+        }
+        if (!(sibling instanceof HTMLElement) || this.hasExplicitCjkLang(sibling) ||
+            sibling.hidden || sibling.getAttribute("aria-hidden") === "true") return null;
+        if (sibling.hasAttribute(this.attribute)) {
+          // A local wrapper is usable only if its text independently confirms
+          // a language; segmentVariant does not read the wrapper's label.
+          return (sibling.textContent || "").trim().slice(0, 500) || null;
+        }
+        if (current instanceof HTMLElement && current.matches(ADJACENT_BLOCKS) &&
+            sibling.tagName === current.tagName) return this.lastDirectText(sibling);
+        return null;
+      }
+      if (sibling || !(current instanceof Text) ||
+          !current.parentElement?.matches(ADJACENT_BLOCKS)) return null;
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  private lastDirectText(element: HTMLElement): string | null {
+    let child = element.lastChild;
+    let checked = 0;
+    while (child && checked++ < 8) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = (child.nodeValue || "").replace(/\s+/g, " ").trim().slice(0, 500);
+        if (text) return CJK_TEXT_RE.test(text) ? text : null;
+      } else if (child instanceof HTMLElement && child.hasAttribute(this.attribute)) {
+        return (child.textContent || "").trim().slice(0, 500) || null;
+      } else if (!(child instanceof HTMLBRElement)) {
+        return null;
+      }
+      child = child.previousSibling;
+    }
+    return null;
   }
 
   private recordVariant(

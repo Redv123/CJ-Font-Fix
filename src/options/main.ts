@@ -190,7 +190,25 @@ for (const key of fontKeys) {
 }
 
 byId<HTMLInputElement>("simpleMode").addEventListener("change", () => updateModeControls(true));
+const mixedLanguageCheckbox = byId<HTMLInputElement>("mixedLanguageDetection");
+const mixedLanguageConsent = byId<HTMLDialogElement>("mixedLanguageConsent");
+mixedLanguageCheckbox.addEventListener("change", () => {
+  if (!mixedLanguageCheckbox.checked) {
+    void saveSettings();
+    return;
+  }
+  // Undo the tentative checkbox change before any automatic save can observe it.
+  mixedLanguageCheckbox.checked = false;
+  mixedLanguageConsent.returnValue = "";
+  mixedLanguageConsent.showModal();
+});
+mixedLanguageConsent.addEventListener("close", () => {
+  if (mixedLanguageConsent.returnValue !== "enable") return;
+  mixedLanguageCheckbox.checked = true;
+  void saveSettings();
+});
 byId("settingsForm").addEventListener("change", (event) => {
+  if (event.target === mixedLanguageCheckbox) return;
   if (event.target instanceof Element && event.target.closest(".site-overrides-section")) return;
   void saveSettings();
 });

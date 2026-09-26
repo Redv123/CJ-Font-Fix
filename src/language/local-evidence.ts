@@ -5,6 +5,7 @@ import type { Variant } from "../shared/types";
 export interface CjkEvidence {
   cjkCount: number;
   kanaCount: number;
+  iterationMarkCount: number;
   japaneseHanClues: number;
   scClues: number;
   tcClues: number;
@@ -19,7 +20,7 @@ export interface LocalEvidenceSample {
 }
 
 const KANA_RE = /[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9d]/u;
-const KANA_OR_HAN_RE = /^[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9d\p{Script=Han}\s\p{P}\p{S}]+$/u;
+const KANA_OR_HAN_RE = /^[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9d\p{Script=Han}々\s\p{P}\p{S}]+$/u;
 
 // Common kokuji and Japanese character forms which differ from both modern
 // Simplified and Traditional Chinese. They are supporting evidence rather
@@ -41,6 +42,7 @@ export function analyzeCjkEvidence(
 ): CjkEvidence {
   let cjkCount = 0;
   let kanaCount = 0;
+  let iterationMarkCount = 0;
   let japaneseHanClues = 0;
   let scClues = 0;
   let tcClues = 0;
@@ -51,6 +53,7 @@ export function analyzeCjkEvidence(
   for (const char of text.slice(0, 500)) {
     if (CJK_TEXT_RE.test(char)) cjkCount++;
     if (KANA_RE.test(char)) kanaCount++;
+    if (char === "々") iterationMarkCount++;
     if (JAPANESE_HAN_CLUES.has(char)) {
       japaneseHanClues++;
       distinctJapaneseHan.add(char);
@@ -87,6 +90,7 @@ export function analyzeCjkEvidence(
   return {
     cjkCount,
     kanaCount,
+    iterationMarkCount,
     japaneseHanClues,
     scClues,
     tcClues,
@@ -102,10 +106,44 @@ export function analyzeCjkEvidence(
  * ambiguous. This is only a local choice after the mixed-page gate has passed;
  * these segments do not contribute to activating that gate.
  */
-export function isKanaOrJapaneseHanOnly(text: string, evidence: CjkEvidence): boolean {
-  return text.length <= 500 && evidence.kanaCount > 0 &&
-    evidence.cjkCount === evidence.kanaCount + evidence.japaneseHanClues &&
-    KANA_OR_HAN_RE.test(text);
+export function isShortJapaneseScriptSegment(text: string, evidence: CjkEvidence): boolean {
+  if (text.length > 500 || !KANA_OR_HAN_RE.test(text)) return false;
+  if (evidence.kanaCount > 0 &&
+    evidence.cjkCount === evidence.kanaCount + evidence.japaneseHanClues) return true;
+
+  // Count the iteration mark as independent but weaker Japanese evidence.
+  // It can tip a short ambiguous line over the threshold alongside kana or
+  // Japanese-form Han, but cannot classify an otherwise uninformative line.
+  const scriptCount = evidence.cjkCount + evidence.iterationMarkCount;
+  const japaneseScore = evidence.kanaCount * 2 +
+    evidence.japaneseHanClues + evidence.iterationMarkCount * 0.5;
+  return evidence.iterationMarkCount > 0 && scriptCount <= 20 &&
+    evidence.scClues < 4 && evidence.tcClues < 4 &&
+    japaneseScore >= 2.5 && japaneseScore / scriptCount >= 0.5;
+}
+
+/**
+ * A confirmed preceding segment may resolve a short ambiguous neighbor, but
+ * it cannot assign a language to shared Han text with no local script clues.
+ * Callers must provide only one directly adjacent, independently classified
+ * segment; passing a context-derived choice would allow errors to cascade.
+ */
+export function variantFromPrecedingEvidence(
+  evidence: CjkEvidence,
+  precedingVariant: Variant | null
+): Variant | null {
+  const scriptCount = evidence.cjkCount + evidence.iterationMarkCount;
+  if (!precedingVariant || evidence.strongVariant || scriptCount < 2 || scriptCount > 30) return null;
+  if (precedingVariant === "jp") {
+    if (evidence.scClues >= 2 || evidence.tcClues >= 2) return null;
+    return evidence.kanaCount > 0 || evidence.iterationMarkCount > 0 ||
+      evidence.japaneseHanClues > 0 ? "jp" : null;
+  }
+  if (evidence.kanaCount > 0 || evidence.iterationMarkCount > 0 ||
+      evidence.japaneseHanClues > 0) return null;
+  const matching = precedingVariant === "sc" ? evidence.scClues : evidence.tcClues;
+  const conflicting = precedingVariant === "sc" ? evidence.tcClues : evidence.scClues;
+  return matching > 0 && conflicting === 0 ? precedingVariant : null;
 }
 
 /**

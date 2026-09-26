@@ -40,6 +40,11 @@ const SITES: readonly SiteCase[] = [
     name: "Bangumi",
     url: "https://bangumi.tv/subject/622206",
     expectedVariant: "sc"
+  },
+  {
+    name: "Japanese YouTube channel",
+    url: "https://www.youtube.com/@%E3%81%9F%E3%81%AC%E3%81%9F%E3%81%AC%E3%81%8D-e9q",
+    expectedVariant: "jp"
   }
 ];
 
@@ -69,7 +74,7 @@ test.beforeAll(async () => {
   context = await chromium.launchPersistentContext(profileDirectory, {
     channel: "chromium",
     executablePath: process.env.CJ_TEST_CHROMIUM_EXECUTABLE,
-    headless: true,
+    headless: process.env.CJ_TEST_HEADLESS !== "0",
     args: [
       `--disable-extensions-except=${extensionDirectory}`,
       `--load-extension=${extensionDirectory}`
@@ -84,6 +89,39 @@ test.afterAll(async () => {
 });
 
 test.describe("real websites in Chromium", () => {
+  test("applies Simple mode to the Chinese Fcitx contributor homepage", async () => {
+    await replaceSettings({
+      simpleMode: true,
+      trustCjkLang: true,
+      defaultChinese: "sc",
+      siteOverrides: {}
+    });
+    const page = await context.newPage();
+    try {
+      const response = await page.goto("https://fcitx-contrib.github.io/", {
+        waitUntil: "domcontentloaded",
+        timeout: 45_000
+      });
+      expect(response?.ok()).toBe(true);
+      await page.waitForTimeout(2_400);
+      const status = await extensionStatus(page);
+      const rootLang = await page.locator("html").getAttribute("lang");
+      const cjkCount = ((await page.locator("body").innerText()).match(/[\p{Script=Han}]/gu) || []).length;
+      expect(cjkCount).toBeGreaterThan(30);
+      expect(status.simpleMode).toBe(true);
+      expect(status.pageVariant).toBe("sc");
+      expect(status.simpleLang).toBe("zh-CN");
+      expect(rootLang).toBe("zh-CN");
+
+      await worker.evaluate(() => chrome.storage.sync.set({ simpleMode: false }));
+      await expect.poll(() => page.locator("html").getAttribute("lang")).toBe("en-US");
+      await worker.evaluate(() => chrome.storage.sync.set({ simpleMode: true }));
+      await expect.poll(() => page.locator("html").getAttribute("lang")).toBe("zh-CN");
+    } finally {
+      await page.close();
+    }
+  });
+
   for (const site of SITES) {
     test(`detects ${site.name}`, async () => {
       await replaceSettings({
@@ -95,7 +133,14 @@ test.describe("real websites in Chromium", () => {
       });
       const page = await context.newPage();
       try {
-        await page.goto(site.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+        const response = await page.goto(site.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+        // A block or challenge response is not a successful observation of the site.
+        expect(response?.ok(), `The site did not return a successful page: ${page.url()}`).toBe(true);
+        if (site.name === "Japanese YouTube channel") {
+          if (new URL(page.url()).hostname === "consent.youtube.com") {
+            await page.getByRole("button", { name: /Reject all/i }).click();
+          }
+        }
         await expect.poll(async () => (await extensionStatus(page)).pageVariant).toBe(site.expectedVariant);
         const status = await extensionStatus(page);
         expect(status.hostname).toBe(new URL(page.url()).hostname);
@@ -251,6 +296,54 @@ test.describe("real websites in Chromium", () => {
       await expect(page.locator("h2.subtitle", { hasText: "大家将" }))
         .toHaveAttribute("data-cjk-fallback-fixed", "sc");
       expect((await extensionStatus(page)).pageVariant).toBe("sc");
+    } finally {
+      await page.close();
+    }
+  });
+
+  test("uses Japanese font for a short iteration-mark line in a mixed Bangumi summary", async () => {
+    const japaneseFont = "CJ Font Fallback E2E JP";
+    await replaceSettings({
+      fontSC: "CJ Font Fallback E2E SC",
+      fontJP: japaneseFont,
+      trustCjkLang: true,
+      preserveWebFonts: false,
+      preserveKnownCjk: true,
+      simpleMode: false,
+      dynamicDetection: true,
+      mixedLanguageDetection: true,
+      siteOverrides: {}
+    });
+    const page = await context.newPage();
+    try {
+      const response = await page.goto("https://bangumi.tv/subject/545008", {
+        waitUntil: "domcontentloaded",
+        timeout: 45_000
+      });
+      expect(response?.ok()).toBe(true);
+      const line = page.locator("#subject_summary [data-cjk-fallback-local='jp']", {
+        hasText: "堂々の開幕！"
+      });
+      await expect(line).toHaveCount(1);
+      const family = await line.evaluate((element) => getComputedStyle(element).fontFamily);
+      expect(family).toContain(japaneseFont);
+      expect(family).not.toContain("CJ Font Fallback E2E SC");
+
+      // Add one weak line directly after an independently Japanese line. The
+      // page is unchanged on the server; this exercises its real summary DOM.
+      const preceding = page.locator("#subject_summary [data-cjk-fallback-local='jp']", {
+        hasText: "次期妃を育成するため"
+      });
+      await expect(preceding).toHaveCount(1);
+      await preceding.evaluate((element) => {
+        element.after(document.createElement("br"), document.createTextNode("夜は"));
+      });
+      const contextual = page.locator("#subject_summary [data-cjk-fallback-local='jp']", {
+        hasText: "夜は"
+      });
+      await expect(contextual).toHaveCount(1);
+      expect(await contextual.evaluate((element) => getComputedStyle(element).fontFamily))
+        .toContain(japaneseFont);
     } finally {
       await page.close();
     }

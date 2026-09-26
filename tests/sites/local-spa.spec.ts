@@ -26,7 +26,7 @@ test.beforeAll(async () => {
   context = await chromium.launchPersistentContext(profileDirectory, {
     channel: "chromium",
     executablePath: process.env.CJ_TEST_CHROMIUM_EXECUTABLE,
-    headless: true,
+    headless: process.env.CJ_TEST_HEADLESS !== "0",
     args: [
       `--disable-extensions-except=${extensionDirectory}`,
       `--load-extension=${extensionDirectory}`
@@ -188,6 +188,62 @@ test("removes mixed-language wrappers when an SPA becomes English-only", async (
     await expect.poll(async () => (await currentStatus()).pageVariant).toBeNull();
     await expect.poll(async () => (await currentStatus()).changedElements).toBe(0);
     await expect(wrappers).toHaveCount(0);
+  } finally {
+    await page.close();
+  }
+});
+
+test("uses only a directly preceding strong segment to resolve weak mixed-page text", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({
+      mixedLanguageDetection: true,
+      dynamicDetection: true,
+      simpleMode: false,
+      trustCjkLang: true,
+      preserveWebFonts: false,
+      preserveKnownCjk: false,
+      fontSC: "CJ Test SC",
+      fontTC: "CJ Test TC",
+      fontJP: "CJ Test JP",
+      siteOverrides: {}
+    });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/mixed-neighbors", (route) => route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<html lang="en-US"><head><title>中文页面字体测试</title></head><body><main>
+        <section id="chinese"><p>${CHINESE.repeat(3)}</p><p id="sc-weak">这本书</p><p id="sc-weak-next">这本书</p></section>
+        <section id="japanese"><p>${JAPANESE.repeat(2)}</p></section>
+        <section id="more-chinese"><p>${CHINESE.repeat(3)}</p></section>
+        <section id="declared"><p lang="zh-CN">${CHINESE}</p><p id="lang-boundary">这本书</p></section>
+        <section id="unrelated"><p id="isolated">这本书</p></section>
+      </main></body></html>`
+    }));
+    await page.goto("https://fixture.test/mixed-neighbors", { waitUntil: "domcontentloaded" });
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).pageVariant).toBe("jp");
+    await expect(page.locator("#sc-weak")).toHaveAttribute("data-cjk-fallback-fixed", "sc");
+    await expect(page.locator("#sc-weak-next")).not.toHaveAttribute("data-cjk-fallback-fixed", "sc");
+    await expect(page.locator("#lang-boundary")).not.toHaveAttribute("data-cjk-fallback-fixed", "sc");
+    await expect(page.locator("#isolated")).not.toHaveAttribute("data-cjk-fallback-fixed", "sc");
+    await expect.poll(() => page.locator("#sc-weak").evaluate((element) =>
+      getComputedStyle(element).fontFamily
+    )).toContain("CJ Test SC");
+
+    await page.locator("#chinese p").first().evaluate((element) => {
+      element.textContent = "日本語の文章に置き換えて、隣の短い文が以前の判定を残さないか確認します。";
+    });
+    await expect(page.locator("#sc-weak")).not.toHaveAttribute("data-cjk-fallback-fixed", "sc");
+
+    await page.locator("#chinese p").first().evaluate((element, text) => {
+      element.textContent = text;
+    }, CHINESE.repeat(3));
+    await expect(page.locator("#sc-weak")).toHaveAttribute("data-cjk-fallback-fixed", "sc");
+    await page.locator("#chinese p").first().evaluate((element) => element.remove());
+    await expect(page.locator("#sc-weak")).not.toHaveAttribute("data-cjk-fallback-fixed", "sc");
   } finally {
     await page.close();
   }

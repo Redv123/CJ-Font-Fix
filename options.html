@@ -28,42 +28,54 @@
         <div class="font-choice-grid">
           <div class="font-choice">
             <h3 data-i18n="simplifiedChinese">Simplified Chinese</h3>
-            <label for="fontSC" data-i18n="sans">Sans</label>
-            <select id="fontSC" name="fontSC" disabled></select>
-            <p id="previewSC" class="font-preview" lang="zh-CN">春宵苦短少女前进吧</p>
-            <label for="fontSCSerif" data-i18n="serif">Serif</label>
-            <select id="fontSCSerif" name="fontSCSerif" disabled></select>
-            <p id="previewSCSerif" class="font-preview serif-preview" lang="zh-CN">春宵苦短少女前进吧</p>
+            <div class="font-choice-field">
+              <label for="fontSC" data-i18n="sans">Sans</label>
+              <select id="fontSC" name="fontSC" disabled></select>
+              <p id="previewSC" class="font-preview" lang="zh-CN">春宵苦短少女前进吧！</p>
+            </div>
+            <div class="font-choice-field">
+              <label for="fontSCSerif" data-i18n="serif">Serif</label>
+              <select id="fontSCSerif" name="fontSCSerif" disabled></select>
+              <p id="previewSCSerif" class="font-preview serif-preview" lang="zh-CN">春宵苦短少女前进吧!</p>
+            </div>
           </div>
           <div class="font-choice">
             <h3 data-i18n="traditionalChinese">Traditional Chinese</h3>
-            <label for="fontTC" data-i18n="sans">Sans</label>
-            <select id="fontTC" name="fontTC" disabled></select>
-            <p id="previewTC" class="font-preview" lang="zh-TW">春宵苦短少女前進吧</p>
-            <label for="fontTCSerif" data-i18n="serif">Serif</label>
-            <select id="fontTCSerif" name="fontTCSerif" disabled></select>
-            <p id="previewTCSerif" class="font-preview serif-preview" lang="zh-TW">春宵苦短少女前進吧</p>
+            <div class="font-choice-field">
+              <label for="fontTC" data-i18n="sans">Sans</label>
+              <select id="fontTC" name="fontTC" disabled></select>
+              <p id="previewTC" class="font-preview" lang="zh-TW">春宵苦短少女前進吧！</p>
+            </div>
+            <div class="font-choice-field">
+              <label for="fontTCSerif" data-i18n="serif">Serif</label>
+              <select id="fontTCSerif" name="fontTCSerif" disabled></select>
+              <p id="previewTCSerif" class="font-preview serif-preview" lang="zh-TW">春宵苦短少女前進吧!</p>
+            </div>
           </div>
           <div class="font-choice">
             <h3 data-i18n="japanese">Japanese</h3>
-            <label for="fontJP" data-i18n="sans">Sans</label>
-            <select id="fontJP" name="fontJP" disabled></select>
-            <p id="previewJP" class="font-preview" lang="ja">夜は短し歩けよ乙女</p>
-            <label for="fontJPSerif" data-i18n="serif">Serif</label>
-            <select id="fontJPSerif" name="fontJPSerif" disabled></select>
-            <p id="previewJPSerif" class="font-preview serif-preview" lang="ja">夜は短し歩けよ乙女</p>
+            <div class="font-choice-field">
+              <label for="fontJP" data-i18n="sans">Sans</label>
+              <select id="fontJP" name="fontJP" disabled></select>
+              <p id="previewJP" class="font-preview" lang="ja">夜は短し歩けよ乙女！</p>
+            </div>
+            <div class="font-choice-field">
+              <label for="fontJPSerif" data-i18n="serif">Serif</label>
+              <select id="fontJPSerif" name="fontJPSerif" disabled></select>
+              <p id="previewJPSerif" class="font-preview serif-preview" lang="ja">夜は短し歩けよ乙女！</p>
+            </div>
           </div>
         </div>
       </section>
 
-      <label class="compact-field">
-        <span data-i18n="defaultChineseVariant">Default Chinese variant</span>
-        <select id="defaultChinese" name="defaultChinese">
+      <div class="compact-field">
+        <label for="defaultChinese" data-i18n="defaultChineseVariant">Default Chinese variant</label>
+        <select id="defaultChinese" name="defaultChinese" aria-describedby="defaultChineseHelp">
           <option value="sc" data-i18n="simplifiedChinese">Simplified Chinese</option>
           <option value="tc" data-i18n="traditionalChinese">Traditional Chinese</option>
         </select>
-        <small data-i18n="defaultChineseHelp">Used when the extension cannot determine whether the page's Chinese text is Simplified or Traditional.</small>
-      </label>
+        <small id="defaultChineseHelp" data-i18n="defaultChineseHelp">Used when the extension cannot determine whether the page's Chinese text is Simplified or Traditional.</small>
+      </div>
 
       <fieldset>
         <legend data-i18n="detectionHeading">Detection</legend>
@@ -116,6 +128,15 @@
         <span id="status" role="status"></span>
       </div>
     </div>
+
+    <dialog id="mixedLanguageConsent" class="settings-dialog" aria-labelledby="mixedLanguageConsentTitle" aria-describedby="mixedLanguageConsentBody">
+      <h2 id="mixedLanguageConsentTitle" data-i18n="mixedLanguageConsentTitle">Enable experimental mixed-language detection?</h2>
+      <p id="mixedLanguageConsentBody" data-i18n="mixedLanguageConsentBody">This feature may mistake short passages for another language and change their fonts or layout. Enable it only if you accept that some pages may not look right.</p>
+      <form method="dialog" class="settings-dialog-actions">
+        <button class="secondary compact" type="submit" value="cancel" autofocus data-i18n="mixedLanguageConsentCancel">Cancel</button>
+        <button class="warning-confirm" type="submit" value="enable" data-i18n="mixedLanguageConsentEnable">Enable anyway</button>
+      </form>
+    </dialog>
 
   </main>
   <script type="module" src="/src/options/main.ts"></script>

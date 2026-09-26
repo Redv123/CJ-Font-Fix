@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeCjkEvidence,
   hasStrongChineseJapaneseMix,
-  isKanaOrJapaneseHanOnly
+  isShortJapaneseScriptSegment,
+  variantFromPrecedingEvidence
 } from "../src/language/local-evidence";
 
 const sc = new Set(Array.from("这为后里个书见说话体与买过没简废烟猫礼道丢"));
@@ -31,18 +32,43 @@ describe("local CJK evidence", () => {
   it("recognizes standalone kana or kana with known Japanese-form Han only after the mixed gate", () => {
     for (const text of ["さよならララ", "『おしまい』", "お"]) {
       expect(analyze(text).strongVariant).toBeNull();
-      expect(isKanaOrJapaneseHanOnly(text, analyze(text))).toBe(true);
+      expect(isShortJapaneseScriptSegment(text, analyze(text))).toBe(true);
     }
-    expect(isKanaOrJapaneseHanOnly("働き", analyze("働き"))).toBe(true);
+    expect(isShortJapaneseScriptSegment("働き", analyze("働き"))).toBe(true);
     for (const text of ["夜は", "大家将 さよならララ 标注为", "さよならララ TV", "東京駅"]) {
-      expect(isKanaOrJapaneseHanOnly(text, analyze(text))).toBe(false);
+      expect(isShortJapaneseScriptSegment(text, analyze(text))).toBe(false);
     }
+  });
+
+  it("adds weak independent iteration-mark evidence to a short mixed-page segment", () => {
+    const phrase = "堂々の開幕！";
+    const evidence = analyze(phrase);
+    expect(evidence.strongVariant).toBeNull();
+    expect(evidence.kanaCount).toBe(1);
+    expect(evidence.iterationMarkCount).toBe(1);
+    expect(isShortJapaneseScriptSegment(phrase, evidence)).toBe(true);
+    for (const text of ["堂の開幕！", "堂々開幕！", "々", "人々", "这是堂々の開幕的介绍", "夜は"]) {
+      expect(isShortJapaneseScriptSegment(text, analyze(text))).toBe(false);
+    }
+  });
+
+  it("uses one confirmed preceding language only when the short segment has matching clues", () => {
+    expect(variantFromPrecedingEvidence(analyze("夜は"), "jp")).toBe("jp");
+    expect(variantFromPrecedingEvidence(analyze("人々"), "jp")).toBe("jp");
+    expect(variantFromPrecedingEvidence(analyze("这本书"), "sc")).toBe("sc");
+    expect(variantFromPrecedingEvidence(analyze("貓與人"), "tc")).toBe("tc");
+    expect(variantFromPrecedingEvidence(analyze("生活"), "jp")).toBeNull();
+    expect(variantFromPrecedingEvidence(analyze("这本书"), "jp")).toBeNull();
+    expect(variantFromPrecedingEvidence(analyze("夜は"), "sc")).toBeNull();
   });
 
   it("uses distinctive Japanese kanji forms as supporting evidence", () => {
     const evidence = analyze("東京駅周辺案内");
     expect(evidence.strongVariant).toBe("jp");
     expect(evidence.japaneseHanClues).toBeGreaterThanOrEqual(2);
+    const videoTitle = analyze("幻想少女大戦　18話　魔理沙ハード2周目");
+    expect(videoTitle.strongVariant).toBe("jp");
+    expect(videoTitle.japaneseHanClues).toBeGreaterThanOrEqual(1);
   });
 
   it("does not let one Japanese-form name override strong Chinese prose", () => {

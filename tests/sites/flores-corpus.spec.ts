@@ -67,7 +67,7 @@ test.describe("@corpus FLORES-200 browser classification", () => {
     context = await chromium.launchPersistentContext(profileDirectory, {
       channel: "chromium",
       executablePath: process.env.CJ_TEST_CHROMIUM_EXECUTABLE,
-      headless: true,
+      headless: process.env.CJ_TEST_HEADLESS !== "0",
       args: [
         `--disable-extensions-except=${extensionDirectory}`,
         `--load-extension=${extensionDirectory}`

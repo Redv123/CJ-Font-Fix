@@ -192,6 +192,86 @@ describe("page language decision order", () => {
     expect(detectLanguage).toHaveBeenCalledOnce();
   });
 
+  it("recognizes the Japanese video titles when browser zh and ja scores nearly tie", async () => {
+    // Short excerpts from https://www.youtube.com/@たぬたぬき-e9q, observed in Chromium.
+    const sample = [
+      "たぬ - YouTube",
+      "アークスレコード　異界に嗤う智の残影(オルタ・ノエティカ)",
+      "アークスレコード　異界に嗤う智の残影(オルタ・ノエティカ)",
+      "幻想少女大戦　18話　魔理沙ハード2周目",
+      "幻想少女大戦　17話　魔理沙ハード2周目",
+      "幻想少女大戦　16話　魔理沙ハード2周目"
+    ].join("\n");
+    browserEnvironment("en", vi.fn().mockResolvedValue({
+      isReliable: true,
+      languages: [
+        { language: "zh", percentage: 35 },
+        { language: "ja", percentage: 32 },
+        { language: "en", percentage: 23 }
+      ]
+    }));
+    const classify = vi.fn().mockReturnValue("tc");
+
+    const result = await detectorWithSample(sample).detect(settings(), classify, null);
+
+    expect(result.variant).toBe("jp");
+    expect(result.detection.reason).toBe("Japanese kana fallback");
+    expect(classify).not.toHaveBeenCalled();
+  });
+
+  it("keeps Chinese prose with Japanese work titles Chinese despite a close browser vote", async () => {
+    const sample = [
+      "我之前一直想买原版漫画，不过单行本太贵，所以直到这次凑单才买了一本。",
+      "书名是《お兄ちゃんはおしまい》，这个漫画有官方中文版《不做欧尼酱了》。",
+      "原作中おしまい也有完蛋了的调侃意味，但整篇介绍仍是中文。",
+      "即使再提一次お兄ちゃんはおしまい，也不能把周围的中文改判成日文。"
+    ].join("\n");
+    const kanaCount = (sample.match(/[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9d]/gu) || []).length;
+    const cjkCount = (sample.match(/[\p{Script=Han}\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9d]/gu) || []).length;
+    expect(kanaCount).toBeGreaterThanOrEqual(20);
+    expect(kanaCount / cjkCount).toBeLessThan(0.40);
+    browserEnvironment("en", vi.fn().mockResolvedValue({
+      isReliable: true,
+      languages: [
+        { language: "zh", percentage: 48 },
+        { language: "ja", percentage: 43 }
+      ]
+    }));
+    const classify = vi.fn().mockReturnValue("sc");
+
+    const result = await detectorWithSample(sample).detect(settings(), classify, null);
+
+    expect(result.variant).toBe("sc");
+    expect(classify).toHaveBeenCalledWith(sample);
+  });
+
+  it("does not turn a Chinese page Japanese just because several titles dominate its kana count", async () => {
+    const sample = [
+      "这是中文频道介绍，讲的是最近的视频内容，也说明作者为什么选择这些作品。",
+      "アークスレコード　異界に嗤う智の残影(オルタ・ノエティカ)",
+      "アークスレコード　異界に嗤う智の残影(オルタ・ノエティカ)",
+      "アークスレコード　異界に嗤う智の残影(オルタ・ノエティカ)",
+      "幻想少女大戦　18話　魔理沙ハード2周目"
+    ].join("\n");
+    const kanaCount = (sample.match(/[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9d]/gu) || []).length;
+    const cjkCount = (sample.match(/[\p{Script=Han}\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9d]/gu) || []).length;
+    expect(kanaCount).toBeGreaterThanOrEqual(20);
+    expect(kanaCount / cjkCount).toBeGreaterThanOrEqual(0.40);
+    browserEnvironment("en", vi.fn().mockResolvedValue({
+      isReliable: true,
+      languages: [
+        { language: "zh", percentage: 48 },
+        { language: "ja", percentage: 43 }
+      ]
+    }));
+    const classify = vi.fn().mockReturnValue("sc");
+
+    const result = await detectorWithSample(sample).detect(settings(), classify, null);
+
+    expect(result.variant).toBe("sc");
+    expect(classify).toHaveBeenCalledWith(sample);
+  });
+
   it("uses the leading Chinese result on mixed content despite an unstable reliability flag", async () => {
     const sample = [
       "Bangumi 番组计划 动画 书籍 游戏 音乐 登录 注册",

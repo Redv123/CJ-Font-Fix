@@ -1,4 +1,6 @@
 import { CJK_TEXT_RE, EXCLUDED } from "./candidate-scan";
+import { SC_CLUES, TC_CLUES } from "../language/chinese-clues";
+import { analyzeCjkEvidence } from "../language/local-evidence";
 import { langToVariant } from "../language/tags";
 import type { DetectionResult, Settings, SiteOverride, Variant } from "../shared/types";
 
@@ -23,6 +25,43 @@ const KANA_RE = /[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9d]/gu;
 
 function isVariant(value: unknown): value is Variant {
   return value === "sc" || value === "tc" || value === "jp";
+}
+
+/**
+ * Resolve only a close browser zh/ja vote using independent Japanese text
+ * segments. A Japanese title quoted inside Chinese prose is not page proof.
+ */
+function hasDominantJapaneseSegments(sample: string): boolean {
+  let japaneseBlocks = 0;
+  let japaneseCharacters = 0;
+  let supportedBlocks = 0;
+  let otherScClues = 0;
+  let otherTcClues = 0;
+  const seen = new Set<string>();
+
+  // collectSample separates DOM text nodes with newlines. Keep repeated UI or
+  // duplicate titles from counting as independent language evidence.
+  for (const line of sample.split("\n")) {
+    const segment = line.trim();
+    if (!segment || seen.has(segment)) continue;
+    // The shared local analyzer examines at most 500 characters. Never use
+    // a truncated long paragraph as evidence for a whole-page override.
+    if (segment.length > 500) return false;
+    seen.add(segment);
+    const evidence = analyzeCjkEvidence(segment, SC_CLUES, TC_CLUES);
+    if (evidence.strongVariant === "jp" && evidence.kanaCount >= 3) {
+      japaneseBlocks++;
+      japaneseCharacters += evidence.cjkCount;
+      if (evidence.japaneseHanClues > 0) supportedBlocks++;
+    } else {
+      if (evidence.strongVariant === "sc" || evidence.strongVariant === "tc") return false;
+      otherScClues += evidence.scClues;
+      otherTcClues += evidence.tcClues;
+    }
+  }
+
+  return japaneseBlocks >= 2 && japaneseCharacters >= 40 && supportedBlocks >= 2 &&
+    otherScClues < 4 && otherTcClues < 4;
 }
 
 /**
@@ -154,6 +193,8 @@ export class PageLanguageDetector {
       (count, char) => count + (CJK_TEXT_RE.test(char) ? 1 : 0), 0
     );
     const cjkRatio = cjkCharCount / Math.max(1, compactSample.length);
+    const kanaCount = (sample.match(KANA_RE) || []).length;
+    const kanaShare = kanaCount / Math.max(1, cjkCharCount);
     if (cjkCharCount === 0) {
       detection.reason = "No CJK text";
       return remember(null);
@@ -174,6 +215,16 @@ export class PageLanguageDetector {
         detection.reason = "Chrome language detection";
         return remember("jp");
       }
+      const japaneseResult = result.languages?.find(({ language }) => language.toLowerCase().startsWith("ja"));
+      // A close zh/ja vote needs corroboration from separate Japanese segments.
+      // Kana totals alone can be dominated by titles on a Chinese page.
+      if (best?.language?.toLowerCase().startsWith("zh") && japaneseResult &&
+          (best.percentage || 0) - (japaneseResult.percentage || 0) <= 10 &&
+          cjkRatio >= 0.15 && hasDominantJapaneseSegments(sample)) {
+        detection.variant = "jp";
+        detection.reason = "Japanese kana fallback";
+        return remember("jp");
+      }
       const leadingChinese = best?.language?.toLowerCase().startsWith("zh") &&
         (chromeConfident || (best.percentage || 0) >= 40);
       if (leadingChinese && cjkRatio >= 0.15) {
@@ -186,8 +237,6 @@ export class PageLanguageDetector {
       console.debug("CJ Font Fallback: language detection failed", error);
     }
 
-    const kanaCount = (sample.match(KANA_RE) || []).length;
-    const kanaShare = kanaCount / Math.max(1, cjkCharCount);
     if (kanaCount >= 4 && kanaShare >= 0.10 && cjkRatio >= 0.15) {
       detection.variant = "jp";
       detection.reason = "Japanese kana fallback";

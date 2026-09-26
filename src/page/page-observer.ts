@@ -169,6 +169,19 @@ export class PageObserver {
     if (!isInsideBody(target)) return false;
 
     updates.queueElement(target);
+    // A removed paragraph can invalidate the mixed-language choice of its
+    // immediate successor even though that successor's own text did not move.
+    if (this.dependencies.settings().mixedLanguageDetection && mutation.removedNodes.length) {
+      const removedPeer = Array.from(mutation.removedNodes).find((node): node is HTMLElement =>
+        node instanceof HTMLElement && node.matches("p, li, blockquote")
+      );
+      let next = mutation.nextSibling;
+      for (let i = 0; i < 4 && next?.nodeType === Node.TEXT_NODE &&
+          !(next.nodeValue || "").trim(); i++) next = next.nextSibling;
+      if (removedPeer && next instanceof HTMLElement && next.tagName === removedPeer.tagName) {
+        updates.queueElement(next);
+      }
+    }
     for (const node of mutation.addedNodes) {
       if (node.nodeType === Node.ELEMENT_NODE) updates.queueRoot(node);
       else if (node.nodeType === Node.TEXT_NODE) updates.queueElement(target);
