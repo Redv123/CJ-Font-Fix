@@ -34,7 +34,7 @@
   "preserveWebFonts": { "message": "保留网站加载的 CJK 字体" },
   "preserveKnownCjk": { "message": "保留网站指定且本机已安装的 CJK 字体" },
   "dynamicDetection": { "message": "监视并重新检测动态页面" },
-  "dynamicDetectionHelp": { "message": "禁用后将保持初次检测结果。" },
+  "dynamicDetectionHelp": { "message": "关闭后，网页内容变化不会触发重新判断语言，也不会自动修正后来出现的文字所用的字体。" },
   "mixedLanguageDetection": { "message": "检测明确分隔的中文和日文文本块（实验性）" },
   "mixedLanguageDetectionHelp": { "message": "仅在两种语言内容都达到足够比例且没有明确 CJK lang 的页面启用。" },
   "mixedLanguageConsentTitle": { "message": "要启用实验性的中日混排识别吗？" },

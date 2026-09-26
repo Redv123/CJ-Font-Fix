@@ -34,7 +34,7 @@
   "preserveWebFonts": { "message": "サイトが読み込んだ適切な中国語・日本語フォントを維持する" },
   "preserveKnownCjk": { "message": "サイトが指定したインストール済みの適切な中国語・日本語フォントを維持する" },
   "dynamicDetection": { "message": "動的ページを監視して再検出する" },
-  "dynamicDetectionHelp": { "message": "オフにすると、最初の検出結果を維持します。" },
+  "dynamicDetectionHelp": { "message": "オフにすると、ページの内容が変わっても言語を再判定せず、後から表示された文字のフォントも自動では修正しません。" },
   "mixedLanguageDetection": { "message": "明確に分かれた中国語と日本語のテキストを検出する（試験的）" },
   "mixedLanguageDetectionHelp": { "message": "両言語の文章が十分にあり、明示的な CJK lang がないページでのみ有効になります。" },
   "mixedLanguageConsentTitle": { "message": "試験的な日中混在テキストの判定を有効にしますか？" },

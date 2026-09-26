@@ -34,7 +34,7 @@
   "preserveWebFonts": { "message": "Keep suitable Chinese/Japanese fonts loaded by the website" },
   "preserveKnownCjk": { "message": "Keep suitable installed Chinese/Japanese fonts named by the website" },
   "dynamicDetection": { "message": "Watch and re-detect dynamic pages" },
-  "dynamicDetectionHelp": { "message": "When disabled, the initial result stays fixed." },
+  "dynamicDetectionHelp": { "message": "When off, changes to the page won't trigger another language check or font correction for text added afterward." },
   "mixedLanguageDetection": { "message": "Detect clearly separated Chinese and Japanese text blocks (experimental)" },
   "mixedLanguageDetectionHelp": { "message": "Only activates on pages with substantial amounts of both languages and no explicit CJK lang." },
   "mixedLanguageConsentTitle": { "message": "Enable experimental mixed-language detection?" },
