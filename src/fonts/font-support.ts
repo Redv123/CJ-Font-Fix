@@ -46,6 +46,9 @@ export class FontSupport {
       for (const face of document.fonts) {
         const family = normalizeFamily(face.family || "");
         if (!family) continue;
+        // Unicode-range subsets load on demand. Unloaded is not failure, but
+        // an errored face cannot supply the website's intended CJK glyphs.
+        if (face.status === "error") continue;
         if (classifyUnicodeRange(face.unicodeRange) === "cjk") {
           this.customCjkFamilies.add(family.toLowerCase());
         }

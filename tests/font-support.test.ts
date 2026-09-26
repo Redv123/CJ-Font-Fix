@@ -91,11 +91,15 @@ describe("regional CJK font names", () => {
 });
 
 describe("website-declared font faces", () => {
-  it("preserves a declared CJK family with unloaded subsets", () => {
+  it("preserves a declared CJK family with unloaded subsets, not failed faces", () => {
     vi.stubGlobal("document", {
       fonts: [
-        { family: "Site CJK", unicodeRange: "U+4E00-9FFF", status: "unloaded" }
-      ]
+        { family: "Site CJK", unicodeRange: "U+4E00-9FFF", status: "unloaded" },
+        { family: "Broken CJK", unicodeRange: "U+4E00-9FFF", status: "error" }
+      ],
+      createElement: () => ({
+        getContext: () => ({ font: "", measureText: () => ({ width: 1 }) })
+      })
     });
     try {
       const support = new FontSupport();
@@ -104,6 +108,7 @@ describe("website-declared font faces", () => {
       expect(support.shouldPreserve(["Site CJK", "sans-serif"], {
         ...DEFAULTS, preserveWebsiteFonts: false
       }, "sc")).toBe(false);
+      expect(support.shouldPreserve(["Broken CJK", "sans-serif"], DEFAULTS, "sc")).toBe(false);
     } finally {
       vi.unstubAllGlobals();
     }
