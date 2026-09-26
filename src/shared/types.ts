@@ -12,8 +12,7 @@ export interface Settings {
   fontJPSerif: string;
   defaultChinese: ChineseVariant;
   trustCjkLang: boolean;
-  preserveWebFonts: boolean;
-  preserveKnownCjk: boolean;
+  preserveWebsiteFonts: boolean;
   simpleMode: boolean;
   dynamicDetection: boolean;
   mixedLanguageDetection: boolean;

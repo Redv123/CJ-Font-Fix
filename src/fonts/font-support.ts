@@ -60,7 +60,7 @@ export class FontSupport {
    * the requested variant, or is an available Fangsong family on Chinese text.
    * Fangsong cannot block a Japanese fallback; other wrong-region families
    * also do not block insertion.
-   * Settings independently control web fonts and known installed families.
+   * One preference covers both declared font faces and named installed fonts.
    */
   shouldPreserve(families: string[], settings: Settings, desiredVariant?: Variant): boolean {
     const genericIndex = families.findIndex(isGenericFamily);
@@ -68,15 +68,13 @@ export class FontSupport {
     const explicit = reachable.filter((family) => !isGenericFamily(family));
     if (!explicit.length) return false;
 
-    if (settings.preserveWebFonts) {
-      const custom = explicit.find((family) => this.customCjkFamilies.has(family.toLowerCase()));
-      if (custom) {
-        const variant = regionalVariantForFamily(custom);
-        if (isFangsongFamily(custom)) return desiredVariant !== "jp";
-        return !desiredVariant || !variant || variant === desiredVariant;
-      }
+    if (!settings.preserveWebsiteFonts) return false;
+    const custom = explicit.find((family) => this.customCjkFamilies.has(family.toLowerCase()));
+    if (custom) {
+      const variant = regionalVariantForFamily(custom);
+      if (isFangsongFamily(custom)) return desiredVariant !== "jp";
+      return !desiredVariant || !variant || variant === desiredVariant;
     }
-    if (!settings.preserveKnownCjk) return false;
     const known = explicit.find((family) =>
       (CJK_NAME_RE.test(family) || isFangsongFamily(family)) && this.appearsAvailable(family)
     );

@@ -18,13 +18,29 @@ export const DEFAULTS: Settings = {
   fontJPSerif: "",
   defaultChinese: defaultChineseForLanguage(browserLanguage),
   trustCjkLang: true,
-  preserveWebFonts: true,
-  preserveKnownCjk: true,
+  preserveWebsiteFonts: true,
   simpleMode: false,
   dynamicDetection: true,
   mixedLanguageDetection: false,
   siteOverrides: {}
 };
+
+export const LEGACY_PRESERVE_KEYS = ["preserveWebFonts", "preserveKnownCjk"] as const;
+export const SETTINGS_STORAGE_KEYS = [...Object.keys(DEFAULTS), ...LEGACY_PRESERVE_KEYS];
+
+/** An old enabled branch keeps the combined website-font preference enabled. */
+export function preserveWebsiteFontsFromStorage(stored: Record<string, unknown>): boolean {
+  if (typeof stored.preserveWebsiteFonts === "boolean") return stored.preserveWebsiteFonts;
+  return stored.preserveWebFonts !== false || stored.preserveKnownCjk !== false;
+}
+
+export function settingsFromStorage(stored: Record<string, unknown>): Settings {
+  return {
+    ...DEFAULTS,
+    ...stored,
+    preserveWebsiteFonts: preserveWebsiteFontsFromStorage(stored)
+  };
+}
 
 export const FONT_SETTINGS = {
   fontSC: { variant: "sc", category: "sans" },

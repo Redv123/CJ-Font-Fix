@@ -4,7 +4,7 @@
  * the closed icon until a page reports actual intervention.
  */
 import { getInstalledFonts, validChoice } from "../settings/font-catalog";
-import { FONT_SETTINGS } from "../settings/defaults";
+import { FONT_SETTINGS, LEGACY_PRESERVE_KEYS, preserveWebsiteFontsFromStorage } from "../settings/defaults";
 import type { FontSettingKey } from "../settings/defaults";
 import type { ActionStateMessage } from "../shared/types";
 
@@ -63,6 +63,13 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 chrome.runtime.onInstalled.addListener(async () => {
   try {
+    const previous = await chrome.storage.sync.get(["preserveWebsiteFonts", ...LEGACY_PRESERVE_KEYS]);
+    if (LEGACY_PRESERVE_KEYS.some((key) => Object.hasOwn(previous, key))) {
+      if (typeof previous.preserveWebsiteFonts !== "boolean") {
+        await chrome.storage.sync.set({ preserveWebsiteFonts: preserveWebsiteFontsFromStorage(previous) });
+      }
+      await chrome.storage.sync.remove([...LEGACY_PRESERVE_KEYS]);
+    }
     const fonts = await getInstalledFonts();
     if (!fonts.length) return;
     const keys = Object.keys(FONT_SETTINGS) as FontSettingKey[];

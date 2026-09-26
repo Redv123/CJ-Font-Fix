@@ -66,7 +66,7 @@ On pages without a trusted specific root declaration, ordinary Advanced mode use
 
 ### Candidates and CSS
 
-`candidate-scan.ts` collects elements that directly own CJK text nodes, plus input/textarea values or placeholders. It avoids styling large ancestors just because descendants contain CJK. Excluded elements include code, preformatted text, scripts, styles, SVG, and canvas. Advanced mode skips an element when no appropriate regional font is configured, when the chosen family is already in its stack, or when an acceptable reachable CJK family or declared CJK web font should be preserved.
+`candidate-scan.ts` collects elements that directly own CJK text nodes, plus input/textarea values or placeholders. It avoids styling large ancestors just because descendants contain CJK. Excluded elements include code, preformatted text, scripts, styles, SVG, and canvas. Advanced mode skips an element when no appropriate regional font is configured, when the chosen family is already in its stack, or when the single website-font preference protects an acceptable reachable CJK family or declared font face. Declared Unicode subsets may be unloaded until needed.
 
 For elements that do need intervention, the controller removes its old attachment, reads the website's computed `font-family` values in a batch, computes new stacks, then writes them in a batch. Explicit Latin families stay ahead of the selected CJK family. A recognized conflicting regional CJK family is moved behind the selected fallback; otherwise insertion is before the first generic family. No platform stack is hard-coded. Serif selection depends on the first generic family (`serif` or `ui-serif`); there is no separate Mono policy.
 

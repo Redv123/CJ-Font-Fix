@@ -46,8 +46,7 @@ test("does not trust an English body lang for Chinese content", async () => {
     await chrome.storage.sync.set({
       fontSC: "CJ Test Sans",
       defaultChinese: "sc",
-      preserveWebFonts: false,
-      preserveKnownCjk: false,
+      preserveWebsiteFonts: false,
       simpleMode: false,
       trustCjkLang: true,
       siteOverrides: {}
@@ -83,8 +82,7 @@ test("uses only the page font when mixed detection is off despite bare zh descen
       fontTC: "CJ Test Traditional",
       fontJP: "CJ Test Japanese",
       trustCjkLang: true,
-      preserveWebFonts: false,
-      preserveKnownCjk: false,
+      preserveWebsiteFonts: false,
       simpleMode: false,
       siteOverrides: {}
     });
@@ -119,8 +117,7 @@ test("does not skip font repair for bare root lang=zh", async () => {
     await chrome.storage.sync.set({
       fontSC: "CJ Test Sans",
       defaultChinese: "sc",
-      preserveWebFonts: false,
-      preserveKnownCjk: false,
+      preserveWebsiteFonts: false,
       simpleMode: false,
       trustCjkLang: true,
       siteOverrides: {}
@@ -152,8 +149,7 @@ test("trusts a specific root CJK lang without inspecting nested content", async 
     await chrome.storage.sync.clear();
     await chrome.storage.sync.set({
       fontSC: "CJ Test Sans",
-      preserveWebFonts: false,
-      preserveKnownCjk: false,
+      preserveWebsiteFonts: false,
       dynamicDetection: true,
       simpleMode: false,
       trustCjkLang: true,
@@ -240,8 +236,7 @@ test("uses only a directly preceding strong segment to resolve weak mixed-page t
       dynamicDetection: true,
       simpleMode: false,
       trustCjkLang: true,
-      preserveWebFonts: false,
-      preserveKnownCjk: false,
+      preserveWebsiteFonts: false,
       fontSC: "CJ Test SC",
       fontTC: "CJ Test TC",
       fontJP: "CJ Test JP",
@@ -293,8 +288,7 @@ test("redetects Japanese content after an in-document history return", async () 
     await chrome.storage.sync.clear();
     await chrome.storage.sync.set({
       fontJP: "CJ Test Japanese",
-      preserveWebFonts: false,
-      preserveKnownCjk: false,
+      preserveWebsiteFonts: false,
       dynamicDetection: true,
       simpleMode: false,
       trustCjkLang: true,
@@ -346,8 +340,7 @@ test("uses the current website stack when repeated text elements change style", 
     await chrome.storage.sync.set({
       fontSC: "CJ Test Sans",
       fontSCSerif: "CJ Test Serif",
-      preserveWebFonts: false,
-      preserveKnownCjk: false,
+      preserveWebsiteFonts: false,
       dynamicDetection: true,
       simpleMode: false,
       siteOverrides: { "fixture.test": "sc" }

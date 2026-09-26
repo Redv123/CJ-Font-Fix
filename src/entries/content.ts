@@ -11,7 +11,7 @@ import type { ExtendedDetection } from "../page/page-language";
 import { PageObserver } from "../page/page-observer";
 import { subtreeContainsCjk } from "../page/candidate-scan";
 import { UpdateQueue } from "../page/update-queue";
-import { DEFAULTS } from "../settings/defaults";
+import { DEFAULTS, SETTINGS_STORAGE_KEYS, settingsFromStorage } from "../settings/defaults";
 import type { ActionStateMessage, ContentMessage, Settings, Variant } from "../shared/types";
 
 /**
@@ -185,7 +185,7 @@ function startContentApplication(): void {
   // Settings and messages are intentionally wired here: they change both the
   // observer lifecycle and the next language/style run.
   async function loadSettings() {
-    settings = { ...DEFAULTS, ...(await chrome.storage.sync.get(DEFAULTS)) };
+    settings = settingsFromStorage(await chrome.storage.sync.get(SETTINGS_STORAGE_KEYS));
     settings.siteOverrides = settings.siteOverrides || {};
   }
 
@@ -233,6 +233,7 @@ function startContentApplication(): void {
         JSON.stringify(changes.siteOverrides.newValue || {}) === JSON.stringify(settings.siteOverrides || {})) {
       return;
     }
+    if (!Object.keys(changes).some((key) => key in DEFAULTS)) return;
     for (const [key, change] of Object.entries(changes)) {
       if (!(key in DEFAULTS)) continue;
       const settingKey = key as keyof Settings;

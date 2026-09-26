@@ -5,14 +5,14 @@
 import { defaultFor, getInstalledFonts, validChoice } from "../settings/font-catalog";
 import { byId, errorMessage } from "../shared/dom";
 import { localizeDocument, message } from "../shared/i18n";
-import { DEFAULTS, FONT_SETTINGS } from "../settings/defaults";
+import { DEFAULTS, FONT_SETTINGS, LEGACY_PRESERVE_KEYS, SETTINGS_STORAGE_KEYS, settingsFromStorage } from "../settings/defaults";
 import { setupSiteLanguageSettings } from "./site-language-settings";
 import type { FontSettingKey } from "../settings/defaults";
 import type { InstalledFont, Settings } from "../shared/types";
 
 const fontKeys = Object.keys(FONT_SETTINGS) as FontSettingKey[];
 const checkKeys = [
-  "trustCjkLang", "preserveWebFonts", "preserveKnownCjk", "simpleMode", "dynamicDetection",
+  "trustCjkLang", "preserveWebsiteFonts", "simpleMode", "dynamicDetection",
   "mixedLanguageDetection"
 ] as const;
 
@@ -37,8 +37,7 @@ function collectValues(): Omit<Settings, "siteOverrides"> {
     fontJPSerif: byId<HTMLSelectElement>("fontJPSerif").value,
     defaultChinese: byId<HTMLSelectElement>("defaultChinese").value === "tc" ? "tc" : "sc",
     trustCjkLang: byId<HTMLInputElement>("trustCjkLang").checked,
-    preserveWebFonts: byId<HTMLInputElement>("preserveWebFonts").checked,
-    preserveKnownCjk: byId<HTMLInputElement>("preserveKnownCjk").checked,
+    preserveWebsiteFonts: byId<HTMLInputElement>("preserveWebsiteFonts").checked,
     simpleMode: byId<HTMLInputElement>("simpleMode").checked,
     dynamicDetection: byId<HTMLInputElement>("dynamicDetection").checked,
     mixedLanguageDetection: byId<HTMLInputElement>("mixedLanguageDetection").checked
@@ -49,6 +48,7 @@ async function saveSettings(): Promise<void> {
   const values = collectValues();
   const operation = saveQueue.catch(() => undefined).then(async () => {
     await chrome.storage.sync.set(values);
+    await chrome.storage.sync.remove([...LEGACY_PRESERVE_KEYS]);
   });
   saveQueue = operation;
   try {
@@ -159,9 +159,8 @@ async function restore(): Promise<void> {
     if (!installedFonts.length) throw new Error(message("fontListEmpty"));
     fillFontMenus();
 
-    const settingKeys = Object.keys(DEFAULTS) as (keyof Settings)[];
-    const stored = await chrome.storage.sync.get(settingKeys) as Partial<Settings>;
-    const values = { ...DEFAULTS, ...stored };
+    const stored = await chrome.storage.sync.get(SETTINGS_STORAGE_KEYS);
+    const values = settingsFromStorage(stored);
     const repairedFonts: Partial<Record<FontSettingKey, string>> = {};
     for (const key of fontKeys) {
       const { variant, category } = FONT_SETTINGS[key];

@@ -90,3 +90,28 @@ test("requires explicit consent each time mixed-language detection is enabled", 
     await page.close();
   }
 });
+
+test("shows one website-font switch and migrates both former values", async () => {
+  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.remove("preserveWebsiteFonts");
+    await chrome.storage.sync.set({ preserveWebFonts: false, preserveKnownCjk: false });
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(await worker.evaluate(() => chrome.runtime.getURL("options.html")));
+    const checkbox = page.locator("#preserveWebsiteFonts");
+    await expect(checkbox).not.toBeChecked();
+    await expect(page.locator("#preserveWebFonts, #preserveKnownCjk")).toHaveCount(0);
+
+    await worker.evaluate(() => chrome.storage.sync.set({ preserveKnownCjk: true }));
+    await page.reload();
+    await expect(checkbox).toBeChecked();
+    await checkbox.uncheck();
+    await expect.poll(() => worker.evaluate(async () =>
+      chrome.storage.sync.get(["preserveWebsiteFonts", "preserveWebFonts", "preserveKnownCjk"])
+    )).toEqual({ preserveWebsiteFonts: false });
+  } finally {
+    await page.close();
+  }
+});
