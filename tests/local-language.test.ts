@@ -40,21 +40,8 @@ describe("local CJK evidence", () => {
     }
   });
 
-  it("adds weak independent iteration-mark evidence to a short mixed-page segment", () => {
-    const phrase = "堂々の開幕！";
-    const evidence = analyze(phrase);
-    expect(evidence.strongVariant).toBeNull();
-    expect(evidence.kanaCount).toBe(1);
-    expect(evidence.iterationMarkCount).toBe(1);
-    expect(isShortJapaneseScriptSegment(phrase, evidence)).toBe(true);
-    for (const text of ["堂の開幕！", "堂々開幕！", "々", "人々", "这是堂々の開幕的介绍", "夜は"]) {
-      expect(isShortJapaneseScriptSegment(text, analyze(text))).toBe(false);
-    }
-  });
-
   it("uses one confirmed preceding language only when the short segment has matching clues", () => {
     expect(variantFromPrecedingEvidence(analyze("夜は"), "jp")).toBe("jp");
-    expect(variantFromPrecedingEvidence(analyze("人々"), "jp")).toBe("jp");
     expect(variantFromPrecedingEvidence(analyze("这本书"), "sc")).toBe("sc");
     expect(variantFromPrecedingEvidence(analyze("貓與人"), "tc")).toBe("tc");
     expect(variantFromPrecedingEvidence(analyze("生活"), "jp")).toBeNull();
@@ -65,10 +52,12 @@ describe("local CJK evidence", () => {
   it("uses distinctive Japanese kanji forms as supporting evidence", () => {
     const evidence = analyze("東京駅周辺案内");
     expect(evidence.strongVariant).toBe("jp");
-    expect(evidence.japaneseHanClues).toBeGreaterThanOrEqual(2);
+    expect(evidence.japaneseCharacterClues).toBeGreaterThanOrEqual(2);
     const videoTitle = analyze("幻想少女大戦　18話　魔理沙ハード2周目");
     expect(videoTitle.strongVariant).toBe("jp");
-    expect(videoTitle.japaneseHanClues).toBeGreaterThanOrEqual(1);
+    expect(videoTitle.japaneseCharacterClues).toBeGreaterThanOrEqual(1);
+    expect(analyze("霊験").strongVariant).toBe("jp");
+    expect(analyze("霊夢").strongVariant).toBeNull();
   });
 
   it("does not let one Japanese-form name override strong Chinese prose", () => {

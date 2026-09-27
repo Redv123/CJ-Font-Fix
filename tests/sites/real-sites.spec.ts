@@ -297,16 +297,17 @@ test.describe("real websites in Chromium", () => {
     }
   });
 
-  test("uses Japanese font for a short iteration-mark line in a mixed Bangumi summary", async () => {
-    const japaneseFont = "CJ Font Fallback E2E JP";
+  test("keeps the existing Chinese and Japanese summary sections readable when mixed mode changes", async () => {
+    const chineseFont = "Noto Sans CJK SC";
+    const japaneseFont = "Noto Sans CJK JP";
     await replaceSettings({
-      fontSC: "CJ Font Fallback E2E SC",
+      fontSC: chineseFont,
       fontJP: japaneseFont,
       trustCjkLang: true,
       preserveWebsiteFonts: false,
       simpleMode: false,
       dynamicDetection: true,
-      mixedLanguageDetection: true,
+      mixedLanguageDetection: false,
       siteOverrides: {}
     });
     const page = await context.newPage();
@@ -316,29 +317,59 @@ test.describe("real websites in Chromium", () => {
         timeout: 45_000
       });
       expect(response?.ok()).toBe(true);
-      const line = page.locator("#subject_summary [data-cjk-fallback-local='jp']", {
-        hasText: "堂々の開幕！"
-      });
-      await expect(line).toHaveCount(1);
-      const family = await line.evaluate((element) => getComputedStyle(element).fontFamily);
-      expect(family).toContain(japaneseFont);
-      expect(family).not.toContain("CJ Font Fallback E2E SC");
+      const summary = page.locator("#subject_summary");
+      await expect(summary).toContainText("[简介原文]");
+      const originalText = (await summary.textContent())?.replace(/\s+/gu, "").trim();
+      const initialStatus = await extensionStatus(page);
+      expect(initialStatus.pageVariant).not.toBeNull();
+      expect(initialStatus.fallbackChoice?.split(", ")).toHaveLength(1);
 
-      // Add one weak line directly after an independently Japanese line. The
-      // page is unchanged on the server; this exercises its real summary DOM.
-      const preceding = page.locator("#subject_summary [data-cjk-fallback-local='jp']", {
-        hasText: "次期妃を育成するため"
+      await worker.evaluate(() => chrome.storage.sync.set({ mixedLanguageDetection: true }));
+      await expect.poll(async () => (await extensionStatus(page)).detectedVariants)
+        .toEqual(expect.arrayContaining(["sc", "jp"]));
+
+      // The page supplies both sections. Read its own text nodes in document
+      // order; the extension's markers are observations, not test selectors.
+      const sections = await summary.evaluate((element) => {
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+        const lines: { section: "chinese" | "japanese"; text: string; family: string }[] = [];
+        let section: "chinese" | "japanese" = "chinese";
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const text = node.nodeValue?.trim() || "";
+          if (text.includes("[简介原文]")) {
+            section = "japanese";
+            continue;
+          }
+          if ((text.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu) || []).length < 5) {
+            continue;
+          }
+          const parent = node.parentElement;
+          if (parent) lines.push({ section, text, family: getComputedStyle(parent).fontFamily });
+        }
+        return lines;
       });
-      await expect(preceding).toHaveCount(1);
-      await preceding.evaluate((element) => {
-        element.after(document.createElement("br"), document.createTextNode("夜は"));
+      const chineseLines = sections.filter((line) => line.section === "chinese");
+      const japaneseLines = sections.filter((line) => line.section === "japanese");
+      expect(chineseLines.length).toBeGreaterThanOrEqual(3);
+      expect(japaneseLines.length).toBeGreaterThanOrEqual(7);
+      const wrongOrder = (
+        lines: typeof sections,
+        selected: string,
+        other: string
+      ) => lines.filter(({ family }) => {
+        const selectedIndex = family.indexOf(selected);
+        const otherIndex = family.indexOf(other);
+        return selectedIndex < 0 || (otherIndex >= 0 && otherIndex < selectedIndex);
       });
-      const contextual = page.locator("#subject_summary [data-cjk-fallback-local='jp']", {
-        hasText: "夜は"
-      });
-      await expect(contextual).toHaveCount(1);
-      expect(await contextual.evaluate((element) => getComputedStyle(element).fontFamily))
-        .toContain(japaneseFont);
+      expect(wrongOrder(chineseLines, chineseFont, japaneseFont)).toEqual([]);
+      expect(wrongOrder(japaneseLines, japaneseFont, chineseFont)).toEqual([]);
+      expect((await summary.textContent())?.replace(/\s+/gu, "").trim()).toBe(originalText);
+
+      await worker.evaluate(() => chrome.storage.sync.set({ mixedLanguageDetection: false }));
+      await expect.poll(() => summary.locator("[data-cjk-fallback-local]").count()).toBe(0);
+      await expect.poll(async () => (await extensionStatus(page)).fallbackChoice?.split(", ").length)
+        .toBe(1);
+      expect((await summary.textContent())?.replace(/\s+/gu, "").trim()).toBe(originalText);
     } finally {
       await page.close();
     }

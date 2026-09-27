@@ -1,6 +1,6 @@
 /** Elements whose text is not page prose and must never become font candidates. */
 export const EXCLUDED = "script, style, noscript, template, svg, canvas, code, pre, kbd, samp";
-export const CJK_TEXT_RE = /[\u3040-\u30ff\u31f0-\u31ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9d\u{20000}-\u{2fa1f}]/u;
+export const CJK_TEXT_RE = /[\u3005\u3040-\u30ff\u31f0-\u31ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9d\u{20000}-\u{2fa1f}]/u;
 
 export function isInsideBody(node: Node | null | undefined): boolean {
   if (!document.body || !node) return false;

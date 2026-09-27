@@ -6,6 +6,7 @@ import type { BrowserContext, Worker } from "@playwright/test";
 import type { ContentStatus } from "../../src/shared/types";
 
 const CHINESE = "在一个人类与兽人共存的世界里，住着一只整天抽着烟、过着懒散生活的兽人。没钱，没生活能力，简直是个废物，礼仪和道德早就跟烟蒂一起被丢进垃圾桶了。";
+const TRADITIONAL = "在一個人類與獸人共存的世界裡，住著一隻整天抽著煙、過著懶散生活的獸人。沒錢，沒生活能力，簡直是個廢物，禮儀和道德早就跟煙蒂一起被丟進垃圾桶了。";
 const JAPANESE = "人間と獣人が共存する世界で、タバコを吸ってダラダラ生きる獣人・ヤニねこ。生活力なし、ろくでなし。それでも充実した日々を過ごしています。";
 
 let context: BrowserContext;
@@ -179,6 +180,49 @@ test("trusts a specific root CJK lang without inspecting nested content", async 
     });
     await expect.poll(async () => (await currentStatus()).changedElements).toBe(0);
     await expect(page.locator("[data-cjk-fallback-stack]")).toHaveCount(0);
+  } finally {
+    await page.close();
+  }
+});
+
+test("keeps the page language stable when a local comment is expanded", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({
+      fontSC: "CJ Test Simplified",
+      fontTC: "CJ Test Traditional",
+      preserveWebsiteFonts: false,
+      dynamicDetection: true,
+      simpleMode: false,
+      trustCjkLang: true,
+      siteOverrides: {}
+    });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/comments", (route) => route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<html lang="en"><head><title>简体中文视频介绍</title></head><body><main>
+        <article id="description"><p>${CHINESE.repeat(3)}</p></article>
+        <section id="comments"></section>
+      </main></body></html>`
+    }));
+    await page.goto("https://fixture.test/comments", { waitUntil: "domcontentloaded" });
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).pageVariant).toBe("sc");
+
+    await page.locator("#comments").evaluate((comments, text) => {
+      const comment = document.createElement("p");
+      comment.id = "expanded-comment";
+      comment.textContent = text;
+      comments.append(comment);
+    }, TRADITIONAL.repeat(5));
+
+    await expect.poll(() => page.locator("#expanded-comment").evaluate((element) =>
+      getComputedStyle(element).fontFamily
+    )).toContain("CJ Test Simplified");
+    await expect.poll(async () => (await currentStatus()).pageVariant).toBe("sc");
   } finally {
     await page.close();
   }

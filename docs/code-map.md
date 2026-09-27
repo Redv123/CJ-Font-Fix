@@ -20,6 +20,7 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 | Normalize `lang` and map SC, TC, JP | `src/language/tags.ts` | `langToVariant()`, `variantToLang()` |
 | Choose SC or TC from Chinese clues | `src/language/tags.ts` | `classifyChinese()` |
 | Store the simplified and traditional clue sets | `src/language/chinese-clues.ts` | `SC_CLUES`, `TC_CLUES` |
+| Store conservative Japanese character clues | `src/language/japanese-character-clues.ts` | `JAPANESE_CHARACTER_CLUES` |
 | Select the page sample and final page variant | `src/page/page-language.ts` | `PageLanguageDetector.collectSample()`, `detect()` |
 | Decide whether a DOM change touches the sample | `src/page/page-language.ts` | `touchesSample()`, `sampleRootWasRemoved()` |
 | Respect explicit descendant CJK `lang` | `src/page/element-language.ts` | `ElementLanguage.explicitVariantFor()`, `browserHandlesLanguageFor()` |

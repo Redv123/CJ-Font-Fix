@@ -38,6 +38,7 @@ interface PageObserverDependencies {
 export class PageObserver {
   private observer: MutationObserver | null = null;
   private observedShadowRoots = new WeakSet<ShadowRoot>();
+  private observedUrl = "";
 
   constructor(private readonly dependencies: PageObserverDependencies) {}
 
@@ -59,6 +60,7 @@ export class PageObserver {
     }
 
     const dynamic = Boolean(current.dynamicDetection);
+    this.observedUrl = location.href;
     this.observer = new MutationObserver((mutations) => this.handleMutations(mutations, dynamic));
     this.observer.observe(document.documentElement || document, this.options(dynamic));
     this.observeOpenShadowRoots(document, dynamic);
@@ -66,14 +68,18 @@ export class PageObserver {
   }
 
   private handleMutations(mutations: MutationRecord[], dynamic: boolean): void {
+    const routeChanged = dynamic && this.consumeUrlChange();
+    const sampleWasReplaced = dynamic && this.sampleWasSubstantiallyRewritten(mutations);
+    const redetectPage = routeChanged || sampleWasReplaced;
     if (this.isDormant()) {
-      this.handleDormantMutations(mutations, dynamic);
+      this.handleDormantMutations(mutations, dynamic, redetectPage);
       return;
     }
 
-    const { managedStyles } = this.dependencies;
+    const { managedStyles, updates } = this.dependencies;
     const rules = managedStyles.rules;
-    let meaningful = false;
+    let meaningful = redetectPage;
+    if (redetectPage) updates.requestFullScan(true);
     let cleanedManagedContent = false;
     const addedElements = new Set<Element>();
     for (const mutation of mutations) {
@@ -199,9 +205,13 @@ export class PageObserver {
    * A no-CJK page stays on a cheaper observer path until relevant sample text
    * appears. Ordinary English SPA churn must not schedule empty full scans.
    */
-  private handleDormantMutations(mutations: MutationRecord[], dynamic: boolean): void {
+  private handleDormantMutations(
+    mutations: MutationRecord[],
+    dynamic: boolean,
+    redetectPage: boolean
+  ): void {
     const { managedStyles, languageDetector, updates } = this.dependencies;
-    let wake = false;
+    let wake = redetectPage;
     const addedElements = new Set<Element>();
     for (const mutation of mutations) {
       if (managedStyles.rules.isStyleNode(mutation.target)) continue;
@@ -253,7 +263,42 @@ export class PageObserver {
     const hostOverride = settings.siteOverrides?.[location.hostname] || "auto";
     if (hostOverride === "off" || isVariant(hostOverride)) return true;
     const declared = langToVariant(document.documentElement?.lang || "");
-    return settings.trustCjkLang && isVariant(declared);
+    if (settings.trustCjkLang && isVariant(declared)) return true;
+    // Content added at the same URL still needs font correction, but it must
+    // not let one expanded comment or feed item replace the page-wide choice.
+    // Route changes and explicit lifecycle requests can still re-detect.
+    return this.dependencies.pageVariant() !== null;
+  }
+
+  /** Detect History API navigation without patching page-owned functions. */
+  private consumeUrlChange(): boolean {
+    const currentUrl = location.href;
+    if (currentUrl === this.observedUrl) return false;
+    this.observedUrl = currentUrl;
+    return true;
+  }
+
+  /**
+   * Recognize replacement of the sampled page itself without treating one
+   * appended comment as a new page. Two existing CJK text nodes becoming
+   * non-CJK is a conservative signal for same-URL view replacement; removing
+   * the selected sample root is definitive.
+   */
+  private sampleWasSubstantiallyRewritten(mutations: MutationRecord[]): boolean {
+    const { languageDetector } = this.dependencies;
+    let replacedCjkNodes = 0;
+    for (const mutation of mutations) {
+      if (mutation.type === "childList" && languageDetector.sampleRootWasRemoved(mutation)) {
+        return true;
+      }
+      if (mutation.type !== "characterData" ||
+          !languageDetector.touchesSample(mutation.target)) continue;
+      if (!CJK_TEXT_RE.test(mutation.oldValue || "") ||
+          CJK_TEXT_RE.test(mutation.target.nodeValue || "")) continue;
+      replacedCjkNodes += 1;
+      if (replacedCjkNodes >= 2) return true;
+    }
+    return false;
   }
 
   private isDormant(): boolean {
@@ -282,6 +327,7 @@ export class PageObserver {
       childList: true,
       subtree: true,
       characterData: true,
+      characterDataOldValue: true,
       attributes: true,
       attributeFilter: ["lang", "class", "style", "placeholder", "value", "rel", "href", "media", "disabled"]
     };

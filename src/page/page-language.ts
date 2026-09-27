@@ -52,7 +52,7 @@ function hasDominantJapaneseSegments(sample: string): boolean {
     if (evidence.strongVariant === "jp" && evidence.kanaCount >= 3) {
       japaneseBlocks++;
       japaneseCharacters += evidence.cjkCount;
-      if (evidence.japaneseHanClues > 0) supportedBlocks++;
+      if (evidence.japaneseCharacterClues > 0) supportedBlocks++;
     } else {
       if (evidence.strongVariant === "sc" || evidence.strongVariant === "tc") return false;
       otherScClues += evidence.scClues;
