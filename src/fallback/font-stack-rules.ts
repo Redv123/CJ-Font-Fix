@@ -6,7 +6,6 @@ interface FontStackRule {
 
 /** Owns reference-counted CSS rules shared by identical completed font stacks. */
 export class FontStackRules {
-  readonly managedAttribute = "data-cjk-fallback-fixed";
   readonly stackAttribute = "data-cjk-fallback-stack";
   readonly styleId = "cjk-font-fallback-generated-rules";
   private readonly rules = new Map<string, FontStackRule>();

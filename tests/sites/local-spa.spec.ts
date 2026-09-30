@@ -106,7 +106,9 @@ test("uses only the page font when mixed detection is off despite bare zh descen
     await expect.poll(async () => (await currentStatus()).pageVariant).toBe("jp");
     await expect.poll(async () => (await currentStatus()).fallbackChoice).toBe("CJ Test Japanese");
     await expect(page.locator("[data-cjk-fallback-local]")).toHaveCount(0);
-    await expect(page.locator("#translation")).toHaveAttribute("data-cjk-fallback-fixed", "jp");
+    await expect.poll(() => page.locator("#translation").evaluate((element) =>
+      getComputedStyle(element).fontFamily
+    )).toContain("CJ Test Japanese");
   } finally {
     await page.close();
   }
@@ -228,6 +230,66 @@ test("keeps the page language stable when a local comment is expanded", async ()
   }
 });
 
+test("updates one split-text element without disturbing other managed elements", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({
+      fontSC: "CJ Test Simplified",
+      fontSCSerif: "CJ Test Serif",
+      preserveWebsiteFonts: false,
+      dynamicDetection: true,
+      simpleMode: false,
+      siteOverrides: { "fixture.test": "sc" }
+    });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/split-text", (route) => route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<html lang="en"><head><style>
+        .sans { font-family: "Site Latin", sans-serif; }
+        .serif { font-family: "Site Serif", serif; }
+      </style></head><body><main>
+        <p id="changed" class="sans">第一段中文<br>第二段中文<br>第三段中文</p>
+        <p id="untouched" class="sans">另一段中文内容</p>
+      </main></body></html>`
+    }));
+    await page.goto("https://fixture.test/split-text", { waitUntil: "domcontentloaded" });
+    const family = (id: string) => page.locator(`#${id}`).evaluate((element) =>
+      getComputedStyle(element).fontFamily
+    );
+    await expect.poll(() => family("changed")).toContain("CJ Test Simplified");
+    await expect.poll(() => family("untouched")).toContain("CJ Test Simplified");
+    await expect(page.locator("[data-cjk-fallback-fixed]")).toHaveCount(0);
+
+    await page.locator("#changed").evaluate((element) => {
+      for (const node of element.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE) node.nodeValue = "English text";
+      }
+    });
+    await expect(page.locator("#changed")).not.toHaveAttribute("data-cjk-fallback-stack", /.+/);
+    expect(await family("changed")).not.toContain("CJ Test Simplified");
+    expect(await family("untouched")).toContain("CJ Test Simplified");
+
+    await page.locator("#changed").evaluate((element) => {
+      for (const node of element.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE) node.nodeValue = "更新后的中文内容";
+      }
+    });
+    await expect.poll(() => family("changed")).toContain("CJ Test Simplified");
+
+    await page.locator("#changed").evaluate((element) => {
+      element.setAttribute("class", "serif");
+    });
+    await expect.poll(() => family("changed")).toContain("CJ Test Serif");
+    expect(await family("changed")).not.toContain("CJ Test Simplified");
+    expect(await family("untouched")).toContain("CJ Test Simplified");
+  } finally {
+    await page.close();
+  }
+});
+
 test("removes mixed-language wrappers when an SPA becomes English-only", async () => {
   await worker.evaluate(async () => {
     await chrome.storage.sync.set({
@@ -303,10 +365,11 @@ test("uses only a directly preceding strong segment to resolve weak mixed-page t
     await page.goto("https://fixture.test/mixed-neighbors", { waitUntil: "domcontentloaded" });
     await page.bringToFront();
     await expect.poll(async () => (await currentStatus()).pageVariant).toBe("jp");
-    await expect(page.locator("#sc-weak")).toHaveAttribute("data-cjk-fallback-fixed", "sc");
-    await expect(page.locator("#sc-weak-next")).not.toHaveAttribute("data-cjk-fallback-fixed", "sc");
-    await expect(page.locator("#lang-boundary")).not.toHaveAttribute("data-cjk-fallback-fixed", "sc");
-    await expect(page.locator("#isolated")).not.toHaveAttribute("data-cjk-fallback-fixed", "sc");
+    for (const id of ["sc-weak-next", "lang-boundary", "isolated"]) {
+      expect(await page.locator(`#${id}`).evaluate((element) =>
+        getComputedStyle(element).fontFamily
+      )).not.toContain("CJ Test SC");
+    }
     await expect.poll(() => page.locator("#sc-weak").evaluate((element) =>
       getComputedStyle(element).fontFamily
     )).toContain("CJ Test SC");
@@ -314,14 +377,20 @@ test("uses only a directly preceding strong segment to resolve weak mixed-page t
     await page.locator("#chinese p").first().evaluate((element) => {
       element.textContent = "日本語の文章に置き換えて、隣の短い文が以前の判定を残さないか確認します。";
     });
-    await expect(page.locator("#sc-weak")).not.toHaveAttribute("data-cjk-fallback-fixed", "sc");
+    await expect.poll(() => page.locator("#sc-weak").evaluate((element) =>
+      getComputedStyle(element).fontFamily
+    )).not.toContain("CJ Test SC");
 
     await page.locator("#chinese p").first().evaluate((element, text) => {
       element.textContent = text;
     }, CHINESE.repeat(3));
-    await expect(page.locator("#sc-weak")).toHaveAttribute("data-cjk-fallback-fixed", "sc");
+    await expect.poll(() => page.locator("#sc-weak").evaluate((element) =>
+      getComputedStyle(element).fontFamily
+    )).toContain("CJ Test SC");
     await page.locator("#chinese p").first().evaluate((element) => element.remove());
-    await expect(page.locator("#sc-weak")).not.toHaveAttribute("data-cjk-fallback-fixed", "sc");
+    await expect.poll(() => page.locator("#sc-weak").evaluate((element) =>
+      getComputedStyle(element).fontFamily
+    )).not.toContain("CJ Test SC");
   } finally {
     await page.close();
   }

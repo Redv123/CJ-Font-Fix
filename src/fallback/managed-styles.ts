@@ -121,7 +121,6 @@ export class ManagedStyles {
       this.markSelfMutation(action.element);
       action.element.setAttribute(this.rules.stackAttribute, ruleId);
     }
-    action.element.setAttribute(this.rules.managedAttribute, action.variant);
     this.states.set(action.element, state);
     this.elements.add(action.element);
     this.changeVariantCount(null, action.variant);
@@ -156,7 +155,6 @@ export class ManagedStyles {
     this.states.delete(element);
     this.markSelfMutation(element);
     element.removeAttribute(this.rules.stackAttribute);
-    element.removeAttribute(this.rules.managedAttribute);
     this.elements.delete(element);
   }
 

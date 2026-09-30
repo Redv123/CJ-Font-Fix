@@ -176,8 +176,6 @@ test.describe("real websites in Chromium", () => {
         "#subject_summary [data-cjk-fallback-local='jp']"
       );
       await expect.poll(() => japaneseSegments.count()).toBe(3);
-      await expect.poll(() => page.locator("#subject_summary").getAttribute("data-cjk-fallback-fixed"))
-        .not.toBe("sc");
       const japaneseFamily = await japaneseSegments.first().evaluate((element) =>
         getComputedStyle(element).fontFamily
       );
@@ -223,7 +221,7 @@ test.describe("real websites in Chromium", () => {
       await expect.poll(async () => (await extensionStatus(page)).changedElements ?? 0).toBeGreaterThan(0);
       const status = await extensionStatus(page);
       expect(status.fallbackChoice).toContain(testFont);
-      await expect.poll(() => page.locator("[data-cjk-fallback-fixed]").count()).toBeGreaterThan(0);
+      await expect.poll(() => page.locator("[data-cjk-fallback-stack]").count()).toBeGreaterThan(0);
       expect(await page.locator("#cjk-font-fallback-generated-rules").textContent()).toContain(testFont);
     } finally {
       await page.close();
@@ -257,7 +255,8 @@ test.describe("real websites in Chromium", () => {
       expect(titleFamily.indexOf("CJ Font Fallback E2E JP"))
         .toBeLessThan(titleFamily.indexOf("SF Pro SC"));
       await expect(heading).toContainText(`大家将 ${title} 标注为`);
-      await expect(heading).toHaveAttribute("data-cjk-fallback-fixed", "sc");
+      expect(await heading.evaluate((element) => getComputedStyle(element).fontFamily))
+        .toContain("CJ Font Fallback E2E SC");
       const status = await extensionStatus(page);
       expect(status.detectedVariants).toEqual(expect.arrayContaining(["sc", "jp"]));
     } finally {
@@ -285,12 +284,14 @@ test.describe("real websites in Chromium", () => {
         timeout: 45_000
       });
       const title = page.locator("h1.nameSingle a", { hasText: "さよならララ" });
-      await expect(title).toHaveAttribute("data-cjk-fallback-fixed", "jp", { timeout: 5_000 });
+      await expect.poll(() => title.evaluate((element) => getComputedStyle(element).fontFamily))
+        .toContain(japaneseFont);
       const titleFamily = await title.evaluate((element) => getComputedStyle(element).fontFamily);
       expect(titleFamily).toContain(japaneseFont);
       expect(titleFamily).not.toContain(chineseFont);
-      await expect(page.locator("h2.subtitle", { hasText: "大家将" }))
-        .toHaveAttribute("data-cjk-fallback-fixed", "sc");
+      await expect.poll(() => page.locator("h2.subtitle", { hasText: "大家将" }).evaluate((element) =>
+        getComputedStyle(element).fontFamily
+      )).toContain(chineseFont);
       expect((await extensionStatus(page)).pageVariant).toBe("sc");
     } finally {
       await page.close();
