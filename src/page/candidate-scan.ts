@@ -47,7 +47,8 @@ export function hasDirectCjkText(element: Element): boolean {
 }
 
 export function addCandidate(candidates: Set<HTMLElement>, element: Element | null): void {
-  if (!(element instanceof HTMLElement) || !isInsideBody(element) || element.matches(EXCLUDED) || closestComposed(element, EXCLUDED)) return;
+  if (!(element instanceof HTMLElement) || candidates.has(element) || !isInsideBody(element) ||
+      element.matches(EXCLUDED) || closestComposed(element, EXCLUDED)) return;
   if (hasDirectCjkText(element)) candidates.add(element);
 }
 

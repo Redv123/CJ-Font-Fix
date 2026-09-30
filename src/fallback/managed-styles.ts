@@ -79,6 +79,8 @@ export class ManagedStyles {
 
   affected(fullScan: boolean, roots: HTMLElement[], elements: HTMLElement[]): Set<HTMLElement> {
     if (fullScan) return new Set(this.elements);
+    // Direct-only changes cannot affect managed elements outside this list.
+    if (!roots.length) return new Set(elements.filter((element) => this.elements.has(element)));
     const direct = new Set(elements);
     const rootSet = new Set(roots);
     const affected = new Set<HTMLElement>();
