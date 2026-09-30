@@ -17,7 +17,6 @@ interface PendingEntry {
 }
 
 export interface FallbackRun {
-  pageVariant: Variant | null;
   detection: ExtendedDetection;
   fullScan: boolean;
   roots?: HTMLElement[];
@@ -55,12 +54,12 @@ export class FallbackController {
   }
 
   apply({
-    pageVariant,
     detection,
     fullScan,
     roots = [],
     elements = []
   }: FallbackRun): ManagedSummary {
+    const pageVariant = detection.variant;
     const settings = this.getSettings();
     const hostOverride = settings.siteOverrides?.[location.hostname] || "auto";
     const forceOverride = detection.reason === "Site override";

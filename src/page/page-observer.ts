@@ -16,7 +16,6 @@ import type { UpdateQueue } from "./update-queue";
 
 interface PageObserverDependencies {
   settings: () => Settings;
-  pageVariant: () => Variant | null;
   detection: () => ExtendedDetection;
   updates: UpdateQueue;
   languageDetector: PageLanguageDetector;
@@ -267,7 +266,7 @@ export class PageObserver {
     // Content added at the same URL still needs font correction, but it must
     // not let one expanded comment or feed item replace the page-wide choice.
     // Route changes and explicit lifecycle requests can still re-detect.
-    return this.dependencies.pageVariant() !== null;
+    return this.dependencies.detection().variant !== null;
   }
 
   /** Detect History API navigation without patching page-owned functions. */
@@ -302,7 +301,8 @@ export class PageObserver {
   }
 
   private isDormant(): boolean {
-    return !this.dependencies.pageVariant() && this.dependencies.detection().reason === "No CJK text";
+    const detection = this.dependencies.detection();
+    return !detection.variant && detection.reason === "No CJK text";
   }
 
   private updateManagedSummary(): void {

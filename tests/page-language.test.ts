@@ -123,7 +123,7 @@ describe("page language decision order", () => {
     );
 
     expect(result.variant).toBeNull();
-    expect(result.detection.reason).toBe("Disabled for this site");
+    expect(result.reason).toBe("Disabled for this site");
     expect(detector.collectSample).not.toHaveBeenCalled();
     expect(detectLanguage).not.toHaveBeenCalled();
   });
@@ -137,7 +137,7 @@ describe("page language decision order", () => {
     );
 
     expect(result.variant).toBe("tc");
-    expect(result.detection.reason).toBe("Site override");
+    expect(result.reason).toBe("Site override");
     expect(detectLanguage).not.toHaveBeenCalled();
   });
 
@@ -154,7 +154,7 @@ describe("page language decision order", () => {
     );
 
     expect(result.variant).toBe(expected);
-    expect(result.detection.reason).toBe("HTML lang");
+    expect(result.reason).toBe("HTML lang");
     expect(detectLanguage).not.toHaveBeenCalled();
   });
 
@@ -168,7 +168,7 @@ describe("page language decision order", () => {
     );
 
     expect(result.variant).toBe("tc");
-    expect(result.detection.reason).toBe("HTML lang + Chinese script clues");
+    expect(result.reason).toBe("HTML lang + Chinese script clues");
     expect(classify).toHaveBeenCalledWith("這是一段繁體中文內容");
     expect(detectLanguage).not.toHaveBeenCalled();
   });
@@ -188,7 +188,7 @@ describe("page language decision order", () => {
     const result = await detectorWithSample(sample).detect(settings(), classify, null);
 
     expect(result.variant).toBe("sc");
-    expect(result.detection.reason).toBe("Chrome detection + Chinese script clues");
+    expect(result.reason).toBe("Chrome detection + Chinese script clues");
     expect(detectLanguage).toHaveBeenCalledOnce();
   });
 
@@ -215,7 +215,7 @@ describe("page language decision order", () => {
     const result = await detectorWithSample(sample).detect(settings(), classify, null);
 
     expect(result.variant).toBe("jp");
-    expect(result.detection.reason).toBe("Japanese kana fallback");
+    expect(result.reason).toBe("Japanese kana fallback");
     expect(classify).not.toHaveBeenCalled();
   });
 
@@ -290,7 +290,7 @@ describe("page language decision order", () => {
     const result = await detectorWithSample(sample).detect(settings(), classify, null);
 
     expect(result.variant).toBe("sc");
-    expect(result.detection.reason).toBe("Chrome detection + Chinese script clues");
+    expect(result.reason).toBe("Chrome detection + Chinese script clues");
     expect(classify).toHaveBeenCalledWith(sample);
   });
 
@@ -307,7 +307,7 @@ describe("page language decision order", () => {
     const result = await detectorWithSample(sample).detect(settings(), () => "sc", null);
 
     expect(result.variant).toBe("jp");
-    expect(result.detection.reason).toBe("Chrome language detection");
+    expect(result.reason).toBe("Chrome language detection");
   });
 
   it("falls back to Japanese when language detection fails but kana evidence is strong", async () => {
@@ -321,7 +321,7 @@ describe("page language decision order", () => {
     );
 
     expect(result.variant).toBe("jp");
-    expect(result.detection.reason).toBe("Japanese kana fallback");
+    expect(result.reason).toBe("Japanese kana fallback");
   });
 
   it("does not activate for a page with no CJK text", async () => {
@@ -333,7 +333,7 @@ describe("page language decision order", () => {
     );
 
     expect(result.variant).toBeNull();
-    expect(result.detection.reason).toBe("No CJK text");
+    expect(result.reason).toBe("No CJK text");
     expect(detectLanguage).not.toHaveBeenCalled();
   });
 

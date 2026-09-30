@@ -12,7 +12,7 @@ import { PageObserver } from "../page/page-observer";
 import { subtreeContainsCjk } from "../page/candidate-scan";
 import { UpdateQueue } from "../page/update-queue";
 import { DEFAULTS, SETTINGS_STORAGE_KEYS, settingsFromStorage } from "../settings/defaults";
-import type { ActionStateMessage, ContentMessage, Settings, Variant } from "../shared/types";
+import type { ActionStateMessage, ContentMessage, Settings } from "../shared/types";
 
 /**
  * Coordinates the content-script lifecycle.
@@ -31,7 +31,6 @@ function startContentApplication(): void {
   const fontStackRules = managedStyles.rules;
 
   let settings: Settings = { ...DEFAULTS };
-  let pageVariant: Variant | null = null;
   let detection: ExtendedDetection = { htmlLang: "", detectedLanguage: "", reliable: false, variant: null, reason: "" };
   let debounceTimer = 0;
   let lastRunAt = 0;
@@ -62,7 +61,6 @@ function startContentApplication(): void {
 
   const pageObserver = new PageObserver({
     settings: () => settings,
-    pageVariant: () => pageVariant,
     detection: () => detection,
     updates,
     languageDetector,
@@ -78,7 +76,7 @@ function startContentApplication(): void {
   }
 
   function pageIsDormant(): boolean {
-    return !pageVariant && detection.reason === "No CJK text";
+    return !detection.variant && detection.reason === "No CJK text";
   }
 
   // Simple mode and advanced fallback are mutually exclusive application
@@ -88,14 +86,14 @@ function startContentApplication(): void {
       fallbackController.restoreMixedLanguage();
       managedStyles.restoreAll();
       fontStackRules.prune();
-      if (detection.reason === "Disabled for this site" || !pageVariant) {
+      if (detection.reason === "Disabled for this site" || !detection.variant) {
         simpleMode.restore();
       } else {
-        simpleMode.apply(pageVariant);
+        simpleMode.apply(detection.variant);
       }
       return { count: 0, variants: [], fonts: [] };
     }
-    return fallbackController.apply({ pageVariant, detection, fullScan, roots, elements });
+    return fallbackController.apply({ detection, fullScan, roots, elements });
   }
 
   // One run consumes a snapshot of queued work. At most one immediate second
@@ -117,20 +115,18 @@ function startContentApplication(): void {
         const { roots, elements } = update;
 
         if (!settings.simpleMode) simpleMode.restore();
-        const oldVariant = pageVariant;
+        const oldVariant = detection.variant;
         if (redetect) {
-          const result = await languageDetector.detect(
+          detection = await languageDetector.detect(
             settings,
             classifyChinese,
             simpleMode.originalLangValue
           );
-          pageVariant = result.variant;
-          detection = result.detection;
         }
-        if (oldVariant !== pageVariant) fullScan = true;
+        if (oldVariant !== detection.variant) fullScan = true;
         const result = applyFallbacks(fullScan, roots, elements);
-        if (settings.simpleMode && pageVariant) simpleMode.stopBootstrap();
-        if (oldVariant !== pageVariant) {
+        if (settings.simpleMode && detection.variant) simpleMode.stopBootstrap();
+        if (oldVariant !== detection.variant) {
           document.dispatchEvent(new CustomEvent("cjk-font-fallback-updated"));
         }
         detection.changedElements = result.count;
@@ -198,9 +194,9 @@ function startContentApplication(): void {
       sendResponse({
         ...detection,
         htmlLang: document.documentElement?.lang || "",
-        pageVariant,
-        detectedVariants: pageVariant
-          ? Array.from(new Set([pageVariant, ...fallbackController.detectedLocalVariants]))
+        pageVariant: detection.variant,
+        detectedVariants: detection.variant
+          ? Array.from(new Set([detection.variant, ...fallbackController.detectedLocalVariants]))
           : [],
         hostname: location.hostname,
         siteOverride: settings.siteOverrides?.[location.hostname] || "auto",

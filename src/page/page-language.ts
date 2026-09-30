@@ -12,12 +12,6 @@ export interface ExtendedDetection extends DetectionResult {
 
 interface AutomaticDetectionCache {
   key: string;
-  variant: Variant | null;
-  detection: ExtendedDetection;
-}
-
-export interface LanguageDetection {
-  variant: Variant | null;
   detection: ExtendedDetection;
 }
 
@@ -145,7 +139,7 @@ export class PageLanguageDetector {
     settings: Settings,
     classifyChinese: (text: string) => "sc" | "tc",
     originalSimpleLang: string | null
-  ): Promise<LanguageDetection> {
+  ): Promise<ExtendedDetection> {
     const htmlLang = settings.simpleMode && originalSimpleLang !== null
       ? originalSimpleLang
       : document.documentElement?.lang || "";
@@ -157,17 +151,17 @@ export class PageLanguageDetector {
 
     if (hostOverride === "off") {
       detection.reason = "Disabled for this site";
-      return { variant: null, detection };
+      return detection;
     }
     if (isVariant(hostOverride)) {
       detection.variant = hostOverride;
       detection.reason = "Site override";
-      return { variant: hostOverride, detection };
+      return detection;
     }
     if (settings.trustCjkLang && declared && declared !== "zh") {
       detection.variant = declared;
       detection.reason = "HTML lang";
-      return { variant: declared, detection };
+      return detection;
     }
 
     const sample = this.collectSample();
@@ -175,18 +169,18 @@ export class PageLanguageDetector {
       htmlLang, sample, settings.defaultChinese, settings.trustCjkLang
     ]);
     if (this.cache?.key === automaticKey) {
-      return { variant: this.cache.variant, detection: { ...this.cache.detection } };
+      return { ...this.cache.detection };
     }
-    const remember = (variant: Variant | null): LanguageDetection => {
-      this.cache = { key: automaticKey, variant, detection: { ...detection } };
-      return { variant, detection };
+    const remember = (): ExtendedDetection => {
+      this.cache = { key: automaticKey, detection: { ...detection } };
+      return detection;
     };
 
     if (settings.trustCjkLang && declared === "zh") {
       const variant = classifyChinese(sample);
       detection.variant = variant;
       detection.reason = "HTML lang + Chinese script clues";
-      return remember(variant);
+      return remember();
     }
     const compactSample = sample.replace(/\s+/g, "");
     const cjkCharCount = Array.from(compactSample).reduce(
@@ -197,11 +191,11 @@ export class PageLanguageDetector {
     const kanaShare = kanaCount / Math.max(1, cjkCharCount);
     if (cjkCharCount === 0) {
       detection.reason = "No CJK text";
-      return remember(null);
+      return remember();
     }
     if (!sample || sample.length < 8) {
       detection.reason = "Not enough CJK text";
-      return remember(null);
+      return remember();
     }
 
     try {
@@ -213,7 +207,7 @@ export class PageLanguageDetector {
       if (chromeConfident && best?.language?.toLowerCase().startsWith("ja") && cjkRatio >= 0.15) {
         detection.variant = "jp";
         detection.reason = "Chrome language detection";
-        return remember("jp");
+        return remember();
       }
       const japaneseResult = result.languages?.find(({ language }) => language.toLowerCase().startsWith("ja"));
       // A close zh/ja vote needs corroboration from separate Japanese segments.
@@ -223,7 +217,7 @@ export class PageLanguageDetector {
           cjkRatio >= 0.15 && hasDominantJapaneseSegments(sample)) {
         detection.variant = "jp";
         detection.reason = "Japanese kana fallback";
-        return remember("jp");
+        return remember();
       }
       const leadingChinese = best?.language?.toLowerCase().startsWith("zh") &&
         (chromeConfident || (best.percentage || 0) >= 40);
@@ -231,7 +225,7 @@ export class PageLanguageDetector {
         const variant = classifyChinese(sample);
         detection.variant = variant;
         detection.reason = "Chrome detection + Chinese script clues";
-        return remember(variant);
+        return remember();
       }
     } catch (error) {
       console.debug("CJ Font Fallback: language detection failed", error);
@@ -240,15 +234,15 @@ export class PageLanguageDetector {
     if (kanaCount >= 4 && kanaShare >= 0.10 && cjkRatio >= 0.15) {
       detection.variant = "jp";
       detection.reason = "Japanese kana fallback";
-      return remember("jp");
+      return remember();
     }
     if (cjkCharCount >= 3 && cjkRatio >= 0.15) {
       const variant = classifyChinese(sample);
       detection.variant = variant;
       detection.reason = "Chinese script clues fallback";
-      return remember(variant);
+      return remember();
     }
     detection.reason = "CJK text is too sparse";
-    return remember(null);
+    return remember();
   }
 }
