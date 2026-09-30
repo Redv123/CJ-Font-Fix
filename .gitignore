@@ -6,3 +6,4 @@ playwright-report/
 .agents/
 .codex/
 skills-lock.json
+.local-test-data/

@@ -9,6 +9,7 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 | Content-script startup, settings changes, scheduling, status reports | `src/entries/content.ts` | top-level initialization and run scheduler |
 | Toolbar icon and install/update font initialization | `src/entries/background.ts` | Chrome event listeners |
 | Interpret DOM mutations | `src/page/page-observer.ts` | `PageObserver.configure()` |
+| Keep or invalidate a page-language result after DOM changes | `src/page/page-observer.ts` | `pageLanguageIsStable()`, `sampleWasSubstantiallyRewritten()` |
 | Merge full scans, roots, and direct elements | `src/page/update-queue.ts` | `UpdateQueue.requestFullScan()`, `queueRoot()`, `queueElement()`, `consume()` |
 | Apply one advanced-mode run | `src/fallback/controller.ts` | `FallbackController.apply()` |
 | Set and restore root `lang` in Simple mode | `src/fallback/simple-mode.ts` | `SimpleMode.apply()`, `restore()` |
@@ -61,9 +62,10 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 | Settings form, autosave, previews, and mixed-mode consent | `src/options/main.ts` | form initialization and event listeners |
 | Site-language manager | `src/options/site-language-settings.ts` | `setupSiteLanguageSettings()` |
 | Popup status and site selection | `src/popup/main.ts` | popup initialization and event listeners |
+| Shared UI element lookup and error text | `src/shared/dom.ts` | `byId()`, `errorMessage()` |
 | Localized strings | `src/shared/i18n.ts`, `_locales/` | `message()`, `localizeDocument()` |
 | Shared settings and message shapes | `src/shared/types.ts` | `Settings`, `ContentStatus`, `ContentMessage` |
 
 ## Tests by owner
 
-Tests mirror the implementation names: `font-family.test.ts`, `font-support.test.ts`, `language.test.ts`, `local-language.test.ts`, `page-language.test.ts`, `element-language.test.ts`, `update-queue.test.ts`, and `site-overrides.test.ts`. Browser behavior belongs under `tests/sites/`; see [testing](testing.md) before treating a unit test as browser evidence.
+Tests mirror the implementation names: `font-family.test.ts`, `font-support.test.ts`, `language.test.ts`, `local-language.test.ts`, `page-language.test.ts`, `element-language.test.ts`, `update-queue.test.ts`, and `site-overrides.test.ts`. Browser behavior belongs under `tests/sites/`; `flores-corpus.spec.ts` is the optional labeled-language evaluation. See [testing](testing.md) before treating a unit test as browser evidence.
