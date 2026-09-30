@@ -4,6 +4,10 @@ import type { ChineseVariant, Variant } from "../shared/types";
 
 export type DeclaredVariant = Variant | "zh" | null;
 
+export function isVariant(value: unknown): value is Variant {
+  return value === "sc" || value === "tc" || value === "jp";
+}
+
 export function langToVariant(lang: string): DeclaredVariant {
   const value = (lang || "").trim().toLowerCase().replace(/_/g, "-");
   if (!value) return null;

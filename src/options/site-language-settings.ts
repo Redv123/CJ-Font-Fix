@@ -1,5 +1,5 @@
 import { byId, errorMessage } from "../shared/dom";
-import { message } from "../shared/i18n";
+import { message, variantLabel } from "../shared/i18n";
 import { isSiteOverride, normalizeHostname, sanitizeSiteOverrides } from "../settings/site-overrides";
 import type { SiteOverride } from "../shared/types";
 
@@ -21,10 +21,10 @@ export function setupSiteLanguageSettings(): void {
     status.classList.toggle("error", isError);
   };
 
-  const variantOption = (value: SiteOverride, labelKey: string): HTMLOptionElement => {
+  const variantOption = (value: SiteOverride): HTMLOptionElement => {
     const option = document.createElement("option");
     option.value = value;
-    option.textContent = message(labelKey);
+    option.textContent = value === "off" ? message("disabled") : variantLabel(value);
     return option;
   };
 
@@ -71,10 +71,10 @@ export function setupSiteLanguageSettings(): void {
       const select = document.createElement("select");
       select.setAttribute("aria-label", message("language"));
       select.append(
-        variantOption("sc", "simplifiedChinese"),
-        variantOption("tc", "traditionalChinese"),
-        variantOption("jp", "japanese"),
-        variantOption("off", "disabled")
+        variantOption("sc"),
+        variantOption("tc"),
+        variantOption("jp"),
+        variantOption("off")
       );
       select.value = override;
       select.addEventListener("change", () => {

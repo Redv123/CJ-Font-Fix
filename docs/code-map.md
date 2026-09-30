@@ -18,7 +18,7 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 
 | Behavior | Owner | Start at |
 | --- | --- | --- |
-| Normalize `lang` and map SC, TC, JP | `src/language/tags.ts` | `langToVariant()`, `variantToLang()` |
+| Normalize `lang`, validate variants, and map SC, TC, JP | `src/language/tags.ts` | `langToVariant()`, `isVariant()`, `variantToLang()` |
 | Choose SC or TC from Chinese clues | `src/language/tags.ts` | `classifyChinese()` |
 | Store the simplified and traditional clue sets | `src/language/chinese-clues.ts` | `SC_CLUES`, `TC_CLUES` |
 | Store conservative Japanese character clues | `src/language/japanese-character-clues.ts` | `JAPANESE_CHARACTER_CLUES` |
@@ -63,7 +63,7 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 | Site-language manager | `src/options/site-language-settings.ts` | `setupSiteLanguageSettings()` |
 | Popup status and site selection | `src/popup/main.ts` | popup initialization and event listeners |
 | Shared UI element lookup and error text | `src/shared/dom.ts` | `byId()`, `errorMessage()` |
-| Localized strings | `src/shared/i18n.ts`, `_locales/` | `message()`, `localizeDocument()` |
+| Localized strings and variant labels | `src/shared/i18n.ts`, `_locales/` | `message()`, `variantLabel()`, `localizeDocument()` |
 | Shared settings and message shapes | `src/shared/types.ts` | `Settings`, `ContentStatus`, `ContentMessage` |
 
 ## Tests by owner

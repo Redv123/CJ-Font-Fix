@@ -1,8 +1,8 @@
 import type { SimpleMode } from "../fallback/simple-mode";
 import type { ManagedStyles } from "../fallback/managed-styles";
 import type { FontSupport } from "../fonts/font-support";
-import { langToVariant } from "../language/tags";
-import type { Settings, Variant } from "../shared/types";
+import { isVariant, langToVariant } from "../language/tags";
+import type { Settings } from "../shared/types";
 import {
   CJK_TEXT_RE,
   closestComposed,
@@ -359,8 +359,4 @@ export class PageObserver {
     if (root instanceof Element) visit(root);
     for (const element of root.querySelectorAll("*")) visit(element);
   }
-}
-
-function isVariant(value: unknown): value is Variant {
-  return value === "sc" || value === "tc" || value === "jp";
 }

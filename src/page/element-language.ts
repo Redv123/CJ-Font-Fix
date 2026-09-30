@@ -1,5 +1,5 @@
 import { closestComposed } from "./candidate-scan";
-import { langToVariant } from "../language/tags";
+import { isVariant, langToVariant } from "../language/tags";
 import type { Settings, Variant } from "../shared/types";
 
 /**
@@ -30,7 +30,7 @@ export class ElementLanguage {
     // leave font selection to the browser. Bare zh and unrelated languages
     // still need the usual CJK detection and font pipeline.
     const variant = langToVariant(owner.getAttribute("lang") || "");
-    return variant === "sc" || variant === "tc" || variant === "jp";
+    return isVariant(variant);
   }
 
   private classifiedVariantFor(owner: Element): Variant | null {

@@ -1,9 +1,21 @@
+import type { Variant } from "./types";
+
+const VARIANT_MESSAGE_KEYS: Record<Variant, string> = {
+  sc: "simplifiedChinese",
+  tc: "traditionalChinese",
+  jp: "japanese"
+};
+
 export function message(
   key: string,
   substitutions?: string | string[],
   fallback = key
 ): string {
   return chrome.i18n.getMessage(key, substitutions) || fallback;
+}
+
+export function variantLabel(variant: Variant): string {
+  return message(VARIANT_MESSAGE_KEYS[variant]);
 }
 
 export function localizeDocument(): void {

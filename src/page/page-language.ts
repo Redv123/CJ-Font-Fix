@@ -1,7 +1,7 @@
 import { CJK_TEXT_RE, EXCLUDED } from "./candidate-scan";
 import { SC_CLUES, TC_CLUES } from "../language/chinese-clues";
 import { analyzeCjkEvidence } from "../language/local-evidence";
-import { langToVariant } from "../language/tags";
+import { isVariant, langToVariant } from "../language/tags";
 import type { DetectionResult, Settings, SiteOverride, Variant } from "../shared/types";
 
 export interface ExtendedDetection extends DetectionResult {
@@ -16,10 +16,6 @@ interface AutomaticDetectionCache {
 }
 
 const KANA_RE = /[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9d]/gu;
-
-function isVariant(value: unknown): value is Variant {
-  return value === "sc" || value === "tc" || value === "jp";
-}
 
 /**
  * Resolve only a close browser zh/ja vote using independent Japanese text

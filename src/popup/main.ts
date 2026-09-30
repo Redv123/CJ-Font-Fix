@@ -3,14 +3,10 @@
  * browser-protected; it is not evidence that language detection returned null.
  */
 import { byId } from "../shared/dom";
-import { localizeDocument, message } from "../shared/i18n";
-import type { ContentMessage, ContentStatus, Variant } from "../shared/types";
-
-const VARIANT_MESSAGE_KEYS: Record<Variant, string> = {
-  sc: "simplifiedChinese",
-  tc: "traditionalChinese",
-  jp: "japanese"
-};
+import { localizeDocument, message, variantLabel } from "../shared/i18n";
+import { isVariant } from "../language/tags";
+import { isSiteOverride } from "../settings/site-overrides";
+import type { ContentMessage, ContentStatus } from "../shared/types";
 
 const REASON_MESSAGE_KEYS: Record<string, string> = {
   "Disabled for this site": "reasonDisabledSite",
@@ -31,14 +27,6 @@ let tabId: number | null = null;
 async function send(message: ContentMessage): Promise<ContentStatus> {
   if (tabId == null) throw new Error("No active tab");
   return chrome.tabs.sendMessage(tabId, message) as Promise<ContentStatus>;
-}
-
-function isVariant(value: unknown): value is Variant {
-  return value === "sc" || value === "tc" || value === "jp";
-}
-
-function variantLabel(variant: Variant): string {
-  return message(VARIANT_MESSAGE_KEYS[variant]);
 }
 
 function reasonLabel(reason: string): string {
@@ -110,7 +98,7 @@ byId<HTMLSelectElement>("override").addEventListener("change", async (event) => 
   statusMessage.textContent = message("applying");
   try {
     const value = (event.currentTarget as HTMLSelectElement).value;
-    if (value !== "auto" && value !== "off" && !isVariant(value)) return;
+    if (value !== "auto" && !isSiteOverride(value)) return;
     await send({ type: "setSiteOverride", value });
     statusMessage.textContent = "";
     window.setTimeout(() => void load(), 150);

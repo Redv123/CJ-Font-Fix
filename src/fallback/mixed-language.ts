@@ -1,5 +1,5 @@
 import { addCandidate, CJK_TEXT_RE, closestComposed } from "../page/candidate-scan";
-import { langToVariant } from "../language/tags";
+import { isVariant, langToVariant } from "../language/tags";
 import {
   hasStrongChineseJapaneseMix,
   isShortJapaneseScriptSegment,
@@ -51,7 +51,7 @@ export class MixedLanguage {
     const cached = this.localVariants.get(element);
     if (cached) return cached;
     const value = element.getAttribute(this.attribute);
-    return value === "sc" || value === "tc" || value === "jp" ? value : null;
+    return isVariant(value) ? value : null;
   }
 
   restoreAll(): void {

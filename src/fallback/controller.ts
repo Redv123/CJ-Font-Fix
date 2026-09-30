@@ -2,7 +2,7 @@ import { composeFontFamily, hasEffectiveFallback, parseFamilies, usesSerifFallba
 import { collectCandidateElements, addCandidate, isInShadowTree } from "../page/candidate-scan";
 import { ElementLanguage } from "../page/element-language";
 import type { FontSupport } from "../fonts/font-support";
-import { langToVariant } from "../language/tags";
+import { isVariant, langToVariant } from "../language/tags";
 import type { CjkEvidence } from "../language/local-evidence";
 import type { AppliedStyleState, ManagedStyles, ManagedSummary, StyleAction } from "./managed-styles";
 import { MixedLanguage } from "./mixed-language";
@@ -214,8 +214,4 @@ export class FallbackController {
     }
     return String((serif && settings.fontSCSerif) || settings.fontSC || "").trim();
   }
-}
-
-function isVariant(value: unknown): value is Variant {
-  return value === "sc" || value === "tc" || value === "jp";
 }
