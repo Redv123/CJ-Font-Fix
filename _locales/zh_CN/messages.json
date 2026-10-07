@@ -1,4 +1,12 @@
 {
+  "noRegistrableDomain": { "message": "此地址没有可注册域名。请选择“仅此主机名”。" },
+  "siteRuleConflict": { "message": "此主机名已有设置。" },
+  "siteScope": { "message": "应用范围" },
+  "hostnameScope": { "message": "仅此主机名" },
+  "domainScope": { "message": "整个域名" },
+  "inheritSiteChoice": { "message": "使用域名设置／自动" },
+  "domainScopeHelp": { "message": "应用于 $1 及其子域名。单独的主机名设置优先。" },
+  "hostnameScopeHelp": { "message": "仅应用于 $1。“自动”会覆盖域名设置。" },
   "extensionName": { "message": "CJ Font Fallback Fix" },
   "extensionShortName": { "message": "CJ Font Fix" },
   "extensionDescription": { "message": "保留网站的西文字体，修复 Linux Chromium 中文、日文字体选择和粗体匹配问题。" },

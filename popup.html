@@ -31,8 +31,15 @@
     </dl>
 
     <div id="siteControls">
+      <label class="override-label" for="siteScope" data-i18n="siteScope">Apply to</label>
+      <select id="siteScope" name="siteScope">
+        <option value="hostname" data-i18n="hostnameScope">This hostname</option>
+        <option value="domain" data-i18n="domainScope">Whole domain</option>
+      </select>
+      <p id="siteScopeHelp" class="message"></p>
       <label class="override-label" for="override" data-i18n="thisSite">This site</label>
-      <select id="override">
+      <select id="override" name="override">
+        <option value="inherit" data-i18n="inheritSiteChoice">Use domain setting / Auto</option>
         <option value="auto" data-i18n="auto">Auto</option>
         <option value="sc" data-i18n="simplifiedChinese">Simplified Chinese</option>
         <option value="tc" data-i18n="traditionalChinese">Traditional Chinese</option>

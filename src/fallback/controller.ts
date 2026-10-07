@@ -1,3 +1,4 @@
+import { getSiteOverride } from "../settings/site-overrides";
 import { composeFontFamily, hasEffectiveFallback, parseFamilies, usesSerifFallback } from "../fonts/font-family";
 import { collectCandidateElements, addCandidate, isInShadowTree } from "../page/candidate-scan";
 import { ElementLanguage } from "../page/element-language";
@@ -61,7 +62,7 @@ export class FallbackController {
   }: FallbackRun): ManagedSummary {
     const pageVariant = detection.variant;
     const settings = this.getSettings();
-    const hostOverride = settings.siteOverrides?.[location.hostname] || "auto";
+    const hostOverride = getSiteOverride(settings);
     const forceOverride = detection.reason === "Site override";
     const declaredRoot = langToVariant(document.documentElement?.lang || "");
     const mixedEligible = settings.mixedLanguageDetection && hostOverride === "auto" &&

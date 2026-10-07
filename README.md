@@ -42,7 +42,7 @@ With **Watch dynamic pages** enabled (the default), Advanced mode corrects fonts
 
 Experimental mixed-language detection is off by default. Enabling it requires confirming a warning about possible misclassified text and altered page appearance; canceling leaves it off.
 
-The popup lets you set a site to **Auto, Simplified Chinese, Traditional Chinese, Japanese, or Disabled**. Site choices are stored by hostname and can be viewed, added, edited, or removed under **Manage site language settings**. Auto removes an override rather than storing an Auto value. **Delete all site settings** clears only site choices; the main **Restore defaults** action does not.
+The popup lets you set a site to **Auto, Simplified Chinese, Traditional Chinese, Japanese, or Disabled**. Choose **This hostname** to affect only the current hostname, or **Whole domain** to include all subdomains of its registered domain. Exact hostname choices take priority. **Auto** for a hostname explicitly bypasses a domain choice; **Use domain setting / Auto** removes that exception. Domain **Auto** removes the domain rule. Both scopes can be viewed, added, edited, or removed under **Manage site language settings**. Existing saved choices remain exact hostname choices. **Delete all site settings** clears only site choices; the main **Restore defaults** action does not.
 
 The interface follows the browser's language: English, Japanese, Simplified Chinese, or Traditional Chinese. If the browser language is not supported, the interface uses English. There is no separate language picker.
 
@@ -53,6 +53,8 @@ Click the toolbar icon to see **HTML lang**, the page's selected or detected var
 The icon reflects **use on the current page**: the book opens when Advanced mode manages at least one font change or Simple mode applies a root `lang`. Simple mode counts as applied even if the root already has the same value. Otherwise the book stays closed. Chrome internal pages, the Chrome Web Store, and some other protected pages do not permit content scripts.
 
 ## Installation
+
+Requires Chrome/Chromium 153 or newer. The `publicSuffix` permission uses the browser’s domain list to match whole-domain choices.
 
 1. Extract the release ZIP.
 2. Open `chrome://extensions` and turn on **Developer mode**.

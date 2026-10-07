@@ -1,3 +1,4 @@
+import { getSiteOverride } from "../settings/site-overrides";
 import type { SimpleMode } from "../fallback/simple-mode";
 import type { ManagedStyles } from "../fallback/managed-styles";
 import type { FontSupport } from "../fonts/font-support";
@@ -51,7 +52,7 @@ export class PageObserver {
     document.removeEventListener("input", this.handleInput, true);
 
     const current = settings();
-    const hostOverride = current.siteOverrides?.[location.hostname] || "auto";
+    const hostOverride = getSiteOverride(current);
     if (hostOverride === "off") return;
     if (current.simpleMode) {
       simpleMode.startBootstrap(true);
@@ -259,7 +260,7 @@ export class PageObserver {
 
   private pageLanguageIsStable(): boolean {
     const settings = this.dependencies.settings();
-    const hostOverride = settings.siteOverrides?.[location.hostname] || "auto";
+    const hostOverride = getSiteOverride(settings);
     if (hostOverride === "off" || isVariant(hostOverride)) return true;
     const declared = langToVariant(document.documentElement?.lang || "");
     if (settings.trustCjkLang && isVariant(declared)) return true;

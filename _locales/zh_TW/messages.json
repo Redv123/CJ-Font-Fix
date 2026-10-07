@@ -1,4 +1,12 @@
 {
+  "noRegistrableDomain": { "message": "此位址沒有可註冊網域。請選擇「僅此主機名稱」。" },
+  "siteRuleConflict": { "message": "此主機名稱已有設定。" },
+  "siteScope": { "message": "套用範圍" },
+  "hostnameScope": { "message": "僅此主機名稱" },
+  "domainScope": { "message": "整個網域" },
+  "inheritSiteChoice": { "message": "使用網域設定／自動" },
+  "domainScopeHelp": { "message": "套用於 $1 及其子網域。個別的主機名稱設定優先。" },
+  "hostnameScopeHelp": { "message": "僅套用於 $1。「自動」會覆蓋網域設定。" },
   "extensionName": { "message": "CJ Font Fallback Fix" },
   "extensionShortName": { "message": "CJ Font Fix" },
   "extensionDescription": { "message": "保留網站的西文字型，修正 Linux Chromium 中文、日文字型選擇與粗體配對問題。" },

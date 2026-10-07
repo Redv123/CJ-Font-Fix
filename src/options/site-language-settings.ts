@@ -1,7 +1,7 @@
 import { byId, errorMessage } from "../shared/dom";
 import { message, variantLabel } from "../shared/i18n";
-import { isSiteOverride, normalizeHostname, sanitizeSiteOverrides } from "../settings/site-overrides";
-import type { SiteOverride } from "../shared/types";
+import { isSiteChoice, normalizeHostname, sanitizeSiteOverrides } from "../settings/site-overrides";
+import type { SiteChoice, SiteScope } from "../shared/types";
 
 /**
  * Sets up the self-contained per-site override editor.
@@ -11,8 +11,8 @@ import type { SiteOverride } from "../shared/types";
  * Restore defaults button is used.
  */
 export function setupSiteLanguageSettings(): void {
-  let saveQueue: Promise<void> = Promise.resolve();
-  let overrides: Record<string, SiteOverride> = {};
+  let overrides: Record<string, SiteChoice> = {};
+  let domains: Record<string, SiteChoice> = {};
   let panelAnimation: Animation | null = null;
 
   const showStatus = (text: string, isError = false): void => {
@@ -21,33 +21,35 @@ export function setupSiteLanguageSettings(): void {
     status.classList.toggle("error", isError);
   };
 
-  const variantOption = (value: SiteOverride): HTMLOptionElement => {
+  const variantOption = (value: SiteChoice): HTMLOptionElement => {
     const option = document.createElement("option");
     option.value = value;
-    option.textContent = value === "off" ? message("disabled") : variantLabel(value);
+    option.textContent = value === "off" ? message("disabled") : value === "auto" ? message("auto") : variantLabel(value);
     return option;
   };
 
-  const save = async (next: Record<string, SiteOverride>): Promise<void> => {
-    overrides = next;
-    render();
-    showStatus("");
-    const snapshot = { ...next };
-    const operation = saveQueue.catch(() => undefined).then(async () => {
-      await chrome.storage.sync.set({ siteOverrides: snapshot });
-    });
-    saveQueue = operation;
+  const save = async (scope: SiteScope, hostname: string, value: SiteChoice | null, previousHostname?: string): Promise<boolean> => {
+    showStatus(message("applying"));
     try {
-      await operation;
+      const reply = await chrome.runtime.sendMessage({ type: "editSiteRule", scope, hostname, value, previousHostname });
+      if (!reply.ok) throw new Error(reply.errorKey ? message(reply.errorKey) : reply.error);
+      await restore();
+      showStatus("");
+      return true;
     } catch (error) {
+      await restore();
       showStatus(message("couldNotSaveSiteOverrides", errorMessage(error)), true);
+      return false;
     }
   };
 
   const render = (): void => {
     const list = byId("siteOverrideList");
-    const entries = Object.entries(overrides).sort(([left], [right]) => left.localeCompare(right));
-    const rows = entries.map(([hostname, override]) => {
+    const entries = [
+      ...Object.entries(overrides).map(([hostname, override]) => ({ hostname, override, scope: "hostname" as const })),
+      ...Object.entries(domains).map(([hostname, override]) => ({ hostname, override, scope: "domain" as const }))
+    ].sort((left, right) => left.hostname.localeCompare(right.hostname));
+    const rows = entries.map(({ hostname, override, scope }) => {
       const row = document.createElement("div");
       row.className = "site-override-row";
 
@@ -62,15 +64,13 @@ export function setupSiteLanguageSettings(): void {
           showStatus(message("invalidWebsite"), true);
           return;
         }
-        const next = { ...overrides };
-        delete next[hostname];
-        next[normalized] = override;
-        void save(next);
+        void save(scope, normalized, override, hostname);
       });
 
       const select = document.createElement("select");
       select.setAttribute("aria-label", message("language"));
       select.append(
+        variantOption("auto"),
         variantOption("sc"),
         variantOption("tc"),
         variantOption("jp"),
@@ -78,9 +78,7 @@ export function setupSiteLanguageSettings(): void {
       );
       select.value = override;
       select.addEventListener("change", () => {
-        const next = { ...overrides };
-        if (isSiteOverride(select.value)) next[hostname] = select.value;
-        void save(next);
+        if (isSiteChoice(select.value)) void save(scope, hostname, select.value);
       });
 
       const remove = document.createElement("button");
@@ -88,12 +86,15 @@ export function setupSiteLanguageSettings(): void {
       remove.className = "secondary compact";
       remove.textContent = message("remove");
       remove.addEventListener("click", () => {
-        const next = { ...overrides };
-        delete next[hostname];
-        void save(next);
+        void save(scope, hostname, null);
       });
 
-      row.append(hostnameInput, select, remove);
+      const hostField = document.createElement("div");
+      const scopeLabel = document.createElement("small");
+      scopeLabel.className = "site-rule-scope";
+      scopeLabel.textContent = message(scope === "domain" ? "domainScope" : "hostnameScope");
+      hostField.append(hostnameInput, scopeLabel);
+      row.append(hostField, select, remove);
       return row;
     });
     list.replaceChildren(...rows);
@@ -103,8 +104,9 @@ export function setupSiteLanguageSettings(): void {
 
   const restore = async (): Promise<void> => {
     try {
-      const stored = await chrome.storage.sync.get("siteOverrides");
-      overrides = sanitizeSiteOverrides(stored.siteOverrides);
+      const stored = await chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides"]);
+      overrides = sanitizeSiteOverrides(stored.siteOverrides, true);
+      domains = sanitizeSiteOverrides(stored.siteDomainOverrides);
       render();
     } catch (error) {
       showStatus(message("couldNotLoadSiteOverrides", errorMessage(error)), true);
@@ -147,29 +149,34 @@ export function setupSiteLanguageSettings(): void {
     }).catch(() => undefined);
   });
 
-  byId<HTMLFormElement>("addSiteOverride").addEventListener("submit", (event) => {
+  byId<HTMLFormElement>("addSiteOverride").addEventListener("submit", async (event) => {
     event.preventDefault();
     const input = byId<HTMLInputElement>("newSiteHostname");
     const hostname = normalizeHostname(input.value);
     const override = byId<HTMLSelectElement>("newSiteVariant").value;
-    if (!hostname || !isSiteOverride(override)) {
+    if (!hostname || !isSiteChoice(override)) {
       showStatus(message("invalidWebsite"), true);
       return;
     }
-    input.value = "";
-    void save({ ...overrides, [hostname]: override });
+    const scope = byId<HTMLSelectElement>("newSiteScope").value as SiteScope;
+    if (await save(scope, hostname, override)) input.value = "";
   });
 
-  byId<HTMLButtonElement>("clearSiteOverrides").addEventListener("click", () => {
-    if (!Object.keys(overrides).length) return;
+  byId<HTMLButtonElement>("clearSiteOverrides").addEventListener("click", async () => {
+    if (!Object.keys(overrides).length && !Object.keys(domains).length) return;
     if (!window.confirm(message("clearSiteOverridesConfirm"))) return;
-    void save({});
+    try {
+      const reply = await chrome.runtime.sendMessage({ type: "clearSiteRules" });
+      if (!reply.ok) throw new Error(reply.errorKey ? message(reply.errorKey) : reply.error);
+      await restore();
+    } catch (error) {
+      showStatus(message("couldNotSaveSiteOverrides", errorMessage(error)), true);
+    }
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== "sync" || !changes.siteOverrides) return;
-    overrides = sanitizeSiteOverrides(changes.siteOverrides.newValue);
-    render();
+    if (area !== "sync" || (!changes.siteOverrides && !changes.siteDomainOverrides)) return;
+    void restore();
   });
 
   void restore();

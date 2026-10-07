@@ -1,4 +1,12 @@
 {
+  "noRegistrableDomain": { "message": "This address has no registrable domain. Choose This hostname instead." },
+  "siteRuleConflict": { "message": "A setting already exists for that hostname." },
+  "siteScope": { "message": "Apply to" },
+  "hostnameScope": { "message": "This hostname" },
+  "domainScope": { "message": "Whole domain" },
+  "inheritSiteChoice": { "message": "Use domain setting / Auto" },
+  "domainScopeHelp": { "message": "Applies to $1 and its subdomains. Exact hostname choices take priority." },
+  "hostnameScopeHelp": { "message": "Applies only to $1. Auto overrides any domain choice." },
   "extensionName": { "message": "CJ Font Fallback Fix" },
   "extensionShortName": { "message": "CJ Font Fix" },
   "extensionDescription": { "message": "Correct Chinese and Japanese font selection and bold matching in Linux Chromium while preserving website Latin fonts." },

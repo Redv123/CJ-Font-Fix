@@ -1,3 +1,4 @@
+import { getSiteOverride } from "../settings/site-overrides";
 import { CJK_TEXT_RE, EXCLUDED } from "./candidate-scan";
 import { SC_CLUES, TC_CLUES } from "../language/chinese-clues";
 import { analyzeCjkEvidence } from "../language/local-evidence";
@@ -140,7 +141,7 @@ export class PageLanguageDetector {
       ? originalSimpleLang
       : document.documentElement?.lang || "";
     const declared = langToVariant(htmlLang);
-    const hostOverride: SiteOverride | "auto" = settings.siteOverrides[location.hostname] || "auto";
+    const hostOverride: SiteOverride | "auto" = getSiteOverride(settings);
     let detection: ExtendedDetection = {
       htmlLang, detectedLanguage: "", reliable: false, variant: null, reason: ""
     };

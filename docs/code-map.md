@@ -58,7 +58,7 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 | Default settings and storage migration | `src/settings/defaults.ts` | `DEFAULTS`, `settingsFromStorage()`, `preserveWebsiteFontsFromStorage()` |
 | Browser UI language to default Chinese variant | `src/settings/defaults.ts` | `defaultChineseForLanguage()` |
 | Installed font list and OS-dependent defaults | `src/settings/font-catalog.ts` | `getInstalledFonts()`, `defaultFor()`, `validChoice()` |
-| Validate and normalize site overrides | `src/settings/site-overrides.ts` | `sanitizeSiteOverrides()`, `normalizeHostname()` |
+| Validate and normalize site overrides | `src/settings/site-overrides.ts` | `getSiteOverride()`, `sanitizeSiteOverrides()`, `normalizeHostname()` |
 | Settings form, autosave, previews, and mixed-mode consent | `src/options/main.ts` | form initialization and event listeners |
 | Site-language manager | `src/options/site-language-settings.ts` | `setupSiteLanguageSettings()` |
 | Popup status and site selection | `src/popup/main.ts` | popup initialization and event listeners |

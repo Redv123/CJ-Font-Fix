@@ -104,8 +104,16 @@
                 <input id="newSiteHostname" type="text" inputmode="url" autocomplete="off" placeholder="example.com" required>
               </label>
               <label>
+                <span data-i18n="siteScope">Apply to</span>
+                <select id="newSiteScope" name="siteScope">
+                  <option value="hostname" data-i18n="hostnameScope">This hostname</option>
+                  <option value="domain" data-i18n="domainScope">Whole domain</option>
+                </select>
+              </label>
+              <label>
                 <span data-i18n="language">Language</span>
                 <select id="newSiteVariant">
+                  <option value="auto" data-i18n="auto">Auto</option>
                   <option value="sc" data-i18n="simplifiedChinese">Simplified Chinese</option>
                   <option value="tc" data-i18n="traditionalChinese">Traditional Chinese</option>
                   <option value="jp" data-i18n="japanese">Japanese</option>

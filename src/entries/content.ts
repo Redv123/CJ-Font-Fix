@@ -1,3 +1,4 @@
+import { currentSiteDomain, getSiteOverride, initializeSiteDomain } from "../settings/site-overrides";
 import { FallbackController } from "../fallback/controller";
 import { ManagedStyles } from "../fallback/managed-styles";
 import { SimpleMode } from "../fallback/simple-mode";
@@ -199,7 +200,10 @@ function startContentApplication(): void {
           ? Array.from(new Set([detection.variant, ...fallbackController.detectedLocalVariants]))
           : [],
         hostname: location.hostname,
-        siteOverride: settings.siteOverrides?.[location.hostname] || "auto",
+        siteOverride: getSiteOverride(settings),
+        siteDomain: currentSiteDomain(),
+        hostnameChoice: settings.siteOverrides[location.hostname],
+        domainChoice: currentSiteDomain() ? settings.siteDomainOverrides[currentSiteDomain()!] : undefined,
         fallbackChoice: !settings.simpleMode ? appliedFonts.join(", ") : "",
         simpleMode: Boolean(settings.simpleMode),
         simpleLang: simpleMode.appliedLang
@@ -208,16 +212,19 @@ function startContentApplication(): void {
     }
     if (message?.type === "setSiteOverride") {
       (async () => {
-        const siteOverrides = { ...settings.siteOverrides };
-        if (message.value === "auto") delete siteOverrides[location.hostname];
-        else siteOverrides[location.hostname] = message.value;
-        settings.siteOverrides = siteOverrides;
-        await chrome.storage.sync.set({ siteOverrides });
+        const reply = await chrome.runtime.sendMessage({
+          type: "editSiteRule",
+          scope: message.scope || "hostname",
+          hostname: location.hostname,
+          value: message.value === "inherit" ? null : message.value
+        });
+        if (!reply.ok) throw new Error(reply.error);
+        await loadSettings();
         pageObserver.configure();
         requestFullScan(true);
         await run();
         sendResponse({ ok: true });
-      })();
+      })().catch((error: unknown) => sendResponse({ ok: false, error: String(error) }));
       return true;
     }
     return false;
@@ -253,7 +260,7 @@ function startContentApplication(): void {
   });
 
   (async () => {
-    await loadSettings();
+    await Promise.all([loadSettings(), initializeSiteDomain()]);
     pageObserver.configure();
     await run();
     if (document.readyState === "loading") {

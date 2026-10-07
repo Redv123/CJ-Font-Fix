@@ -5,8 +5,8 @@
 import { byId } from "../shared/dom";
 import { localizeDocument, message, variantLabel } from "../shared/i18n";
 import { isVariant } from "../language/tags";
-import { isSiteOverride } from "../settings/site-overrides";
-import type { ContentMessage, ContentStatus } from "../shared/types";
+import { isSiteChoice } from "../settings/site-overrides";
+import type { ContentMessage, ContentStatus, SiteRuleResult, SiteScope } from "../shared/types";
 
 const REASON_MESSAGE_KEYS: Record<string, string> = {
   "Disabled for this site": "reasonDisabledSite",
@@ -23,10 +23,27 @@ const REASON_MESSAGE_KEYS: Record<string, string> = {
 };
 
 let tabId: number | null = null;
+let currentStatus: ContentStatus | null = null;
 
-async function send(message: ContentMessage): Promise<ContentStatus> {
+function updateSiteControls(): void {
+  if (!currentStatus) return;
+  const scope = byId<HTMLSelectElement>("siteScope");
+  scope.querySelector<HTMLOptionElement>('[value="domain"]')!.disabled = !currentStatus.siteDomain;
+  if (!currentStatus.siteDomain) scope.value = "hostname";
+  const domainScope = scope.value === "domain";
+  const select = byId<HTMLSelectElement>("override");
+  select.querySelector<HTMLOptionElement>('[value="inherit"]')!.hidden = domainScope;
+  select.value = domainScope ? currentStatus.domainChoice || "auto" : currentStatus.hostnameChoice || "inherit";
+  byId("siteScopeHelp").textContent = domainScope
+    ? message("domainScopeHelp", currentStatus.siteDomain || "")
+    : message("hostnameScopeHelp", currentStatus.hostname);
+}
+
+function send(message: Extract<ContentMessage, { type: "getStatus" }>): Promise<ContentStatus>;
+function send(message: Extract<ContentMessage, { type: "setSiteOverride" }>): Promise<SiteRuleResult>;
+async function send(message: ContentMessage): Promise<ContentStatus | SiteRuleResult> {
   if (tabId == null) throw new Error("No active tab");
-  return chrome.tabs.sendMessage(tabId, message) as Promise<ContentStatus>;
+  return chrome.tabs.sendMessage(tabId, message);
 }
 
 function reasonLabel(reason: string): string {
@@ -39,6 +56,7 @@ async function load(): Promise<void> {
   tabId = tab?.id ?? null;
   try {
     const status = await send({ type: "getStatus" });
+    currentStatus = status;
     byId("unavailableState").hidden = true;
     byId("statusGrid").hidden = false;
     byId("siteControls").hidden = false;
@@ -83,7 +101,7 @@ async function load(): Promise<void> {
     else if (status.pageVariant) intervention = message("notNeeded");
     byId("intervention").textContent = intervention;
     byId("changed").textContent = String(changedElements);
-    byId<HTMLSelectElement>("override").value = status.siteOverride || "auto";
+    updateSiteControls();
   } catch {
     byId("site").textContent = message("notEnabledOnPage");
     byId("statusGrid").hidden = true;
@@ -98,14 +116,17 @@ byId<HTMLSelectElement>("override").addEventListener("change", async (event) => 
   statusMessage.textContent = message("applying");
   try {
     const value = (event.currentTarget as HTMLSelectElement).value;
-    if (value !== "auto" && !isSiteOverride(value)) return;
-    await send({ type: "setSiteOverride", value });
+    if (value !== "inherit" && !isSiteChoice(value)) return;
+    const reply = await send({ type: "setSiteOverride", value, scope: byId<HTMLSelectElement>("siteScope").value as SiteScope });
+    if (!reply.ok) throw new Error("Could not save site choice");
     statusMessage.textContent = "";
     window.setTimeout(() => void load(), 150);
   } catch {
     statusMessage.textContent = message("couldNotUpdatePage");
   }
 });
+
+byId<HTMLSelectElement>("siteScope").addEventListener("change", updateSiteControls);
 
 byId<HTMLButtonElement>("settings").addEventListener("click", () => {
   void chrome.runtime.openOptionsPage();

@@ -1,3 +1,4 @@
+import { sanitizeSiteOverrides } from "./site-overrides";
 import type { ChineseVariant, Settings, Variant } from "../shared/types";
 
 /** Use the browser UI locale only when no Chinese default has been saved. */
@@ -22,7 +23,8 @@ export const DEFAULTS: Settings = {
   simpleMode: false,
   dynamicDetection: true,
   mixedLanguageDetection: false,
-  siteOverrides: {}
+  siteOverrides: {},
+  siteDomainOverrides: {}
 };
 
 export const LEGACY_PRESERVE_KEYS = ["preserveWebFonts", "preserveKnownCjk"] as const;
@@ -38,6 +40,8 @@ export function settingsFromStorage(stored: Record<string, unknown>): Settings {
   return {
     ...DEFAULTS,
     ...stored,
+    siteOverrides: sanitizeSiteOverrides(stored.siteOverrides, true),
+    siteDomainOverrides: sanitizeSiteOverrides(stored.siteDomainOverrides),
     preserveWebsiteFonts: preserveWebsiteFontsFromStorage(stored)
   };
 }

@@ -1,15 +1,46 @@
-import type { SiteOverride } from "../shared/types";
+import type { Settings, SiteChoice, SiteOverride } from "../shared/types";
+
+let pageDomain: string | null = null;
+
+/** Content scripts cannot access publicSuffix; resolve once through the worker. */
+export async function initializeSiteDomain(): Promise<void> {
+  pageDomain = await chrome.runtime.sendMessage({ type: "getSiteDomain" });
+}
+
+export function currentSiteDomain(): string | null {
+  return pageDomain;
+}
+
+export function getSiteOverride(
+  settings: Pick<Settings, "siteOverrides" | "siteDomainOverrides">,
+  hostname = location.hostname,
+  domain: string | null = pageDomain
+): SiteChoice {
+  const exact = Object.hasOwn(settings.siteOverrides, hostname) ? settings.siteOverrides[hostname] : undefined;
+  if (isSiteChoice(exact)) return exact;
+  const domains = settings.siteDomainOverrides;
+  const inherited = domain && domains && Object.hasOwn(domains, domain) ? domains[domain] : undefined;
+  return isSiteOverride(inherited) ? inherited : "auto";
+}
 
 /** Validates and normalizes the hostname-keyed settings stored by the UI. */
 export function isSiteOverride(value: unknown): value is SiteOverride {
   return value === "sc" || value === "tc" || value === "jp" || value === "off";
 }
 
-export function sanitizeSiteOverrides(value: unknown): Record<string, SiteOverride> {
+export function isSiteChoice(value: unknown): value is SiteChoice {
+  return value === "auto" || isSiteOverride(value);
+}
+
+export function sanitizeSiteOverrides(value: unknown, allowAutomatic: true): Record<string, SiteChoice>;
+export function sanitizeSiteOverrides(value: unknown, allowAutomatic?: false): Record<string, SiteOverride>;
+export function sanitizeSiteOverrides(value: unknown, allowAutomatic = false): Record<string, SiteChoice> {
   if (!value || typeof value !== "object") return {};
-  const result: Record<string, SiteOverride> = {};
+  const result: Record<string, SiteChoice> = {};
   for (const [hostname, override] of Object.entries(value)) {
-    if (hostname && isSiteOverride(override)) result[hostname] = override;
+    if (hostname && (isSiteOverride(override) || (allowAutomatic && override === "auto"))) {
+      Object.defineProperty(result, hostname, { value: override, enumerable: true, configurable: true, writable: true });
+    }
   }
   return result;
 }

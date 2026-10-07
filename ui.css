@@ -97,7 +97,7 @@ dd { margin: 0; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
 .site-override-list { display: grid; gap: 8px; margin: 14px 0; }
 .site-override-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(170px, .7fr) auto; align-items: center; gap: 9px; }
 .site-override-row button { min-height: 36px; }
-.add-site-override { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(170px, .7fr) auto; align-items: end; gap: 9px; margin-top: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; }
+.add-site-override { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(130px, .7fr) minmax(140px, .7fr) auto; align-items: end; gap: 9px; margin-top: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; }
 .add-site-override label > span { margin-bottom: 6px; }
 .add-site-override button { min-height: 36px; }
 .site-overrides-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }
@@ -143,3 +143,5 @@ button.danger:disabled:hover, button.danger:disabled:active { color: #b42318; bo
   .font-choice { grid-template-columns: 1fr; }
   .font-choice h3 { grid-column: auto; }
 }
+
+.site-rule-scope { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }

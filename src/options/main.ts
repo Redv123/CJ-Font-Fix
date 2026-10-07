@@ -27,7 +27,7 @@ function showStatus(message: string, isError = false): void {
   status.classList.toggle("error", isError);
 }
 
-function collectValues(): Omit<Settings, "siteOverrides"> {
+function collectValues(): Omit<Settings, "siteOverrides" | "siteDomainOverrides"> {
   return {
     fontSC: byId<HTMLSelectElement>("fontSC").value,
     fontTC: byId<HTMLSelectElement>("fontTC").value,

@@ -86,7 +86,7 @@ The mixed detector is off by default, advanced-mode-only, and ineligible when th
 
 ## Settings and UI state
 
-Defaults and font choices live in `src/settings/`; the options page saves changes immediately. Site overrides are stored by hostname, not URL path, and are managed separately. In the site manager, `Auto` means deleting the entry; it is not a persisted override value. The main **Restore defaults** action does not delete site overrides. An unavailable page has no per-site controls in the popup because its content script cannot receive messages.
+Defaults and font choices live in `src/settings/`; the options page saves changes immediately. Site overrides are stored in separate exact-hostname and registered-domain maps, not by URL path, and are managed separately. The background worker resolves the registered domain using `publicSuffix` once per document and serializes rule edits across popup and Settings. `settings/site-overrides.ts` resolves exact hostname choices before domain choices. An exact hostname `Auto` choice explicitly bypasses domain rules. Removing the entry restores inheritance; domain `Auto` deletes its rule. The main **Restore defaults** action does not delete site overrides. An unavailable page has no per-site controls in the popup because its content script cannot receive messages.
 
 The popup distinguishes the page result from actual intervention: a page may be detected as SC, TC, or JP while CSS is **Not needed**, or while no configured regional font can be applied. The icon opens only when CSS is attached (or Simple mode applies a root language), not merely because a CJK language was detected.
 

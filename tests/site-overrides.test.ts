@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getSiteOverride,
   isSiteOverride,
   normalizeHostname,
   sanitizeSiteOverrides
@@ -55,5 +56,26 @@ describe("site hostname normalization", () => {
     "ftp://example.com"
   ])("rejects invalid or unsupported input %j", (input) => {
     expect(normalizeHostname(input)).toBeNull();
+  });
+});
+
+
+describe("site rule matching", () => {
+  it("ignores inherited object properties when matching a local hostname", () => {
+    expect(getSiteOverride({ siteOverrides: {}, siteDomainOverrides: {} }, "constructor", null)).toBe("auto");
+  });
+  it("keeps an explicit automatic exception in hostname settings", () => {
+    expect(sanitizeSiteOverrides({ "zh.example.com": "auto" }, true)).toEqual({ "zh.example.com": "auto" });
+  });
+  it.each(["sc", "off", "auto"] as const)("lets an exact %s choice override the domain choice", (choice) => {
+    expect(getSiteOverride({ siteOverrides: { "zh.example.com": choice }, siteDomainOverrides: { "example.com": "jp" } }, "zh.example.com", "example.com")).toBe(choice);
+  });
+  it("keeps separate hosted sites and local hosts automatic", () => {
+    const rules = { siteOverrides: {}, siteDomainOverrides: { "alice.github.io": "jp", "github.io": "off", "example.com": "sc" } } as const;
+    expect(getSiteOverride(rules, "bob.github.io", "bob.github.io")).toBe("auto");
+    expect(getSiteOverride(rules, "localhost", null)).toBe("auto");
+  });
+  it("uses a domain choice for related subdomains", () => {
+    expect(getSiteOverride({ siteOverrides: {}, siteDomainOverrides: { "example.co.uk": "jp" } }, "m.example.co.uk", "example.co.uk")).toBe("jp");
   });
 });

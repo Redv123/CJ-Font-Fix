@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
   "short_name": "__MSG_extensionShortName__",
-  "version": "0.9.3",
+  "version": "0.9.4",
+  "minimum_chrome_version": "153",
   "description": "__MSG_extensionDescription__",
   "default_locale": "en",
   "icons": {
@@ -11,7 +12,7 @@
     "48": "icons/icon-active-48.png",
     "128": "icons/icon-active-128.png"
   },
-  "permissions": ["storage", "fontSettings"],
+  "permissions": ["storage", "fontSettings", "publicSuffix"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

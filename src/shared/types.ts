@@ -1,6 +1,8 @@
 export type Variant = "sc" | "tc" | "jp";
 export type ChineseVariant = Extract<Variant, "sc" | "tc">;
 export type SiteOverride = Variant | "off";
+export type SiteChoice = SiteOverride | "auto";
+export type SiteScope = "hostname" | "domain";
 export type FontCategory = "sans" | "serif";
 
 export interface Settings {
@@ -16,7 +18,8 @@ export interface Settings {
   simpleMode: boolean;
   dynamicDetection: boolean;
   mixedLanguageDetection: boolean;
-  siteOverrides: Record<string, SiteOverride>;
+  siteOverrides: Record<string, SiteChoice>;
+  siteDomainOverrides: Record<string, SiteOverride>;
 }
 
 export interface DetectionResult {
@@ -37,12 +40,28 @@ export interface ContentStatus {
   fallbackChoice: string | null;
   changedElements: number;
   simpleLang: string;
-  siteOverride: SiteOverride | null;
+  siteOverride: SiteChoice | null;
+  siteDomain?: string | null;
+  hostnameChoice?: SiteChoice;
+  domainChoice?: SiteOverride;
 }
 
 export type ContentMessage =
   | { type: "getStatus" }
-  | { type: "setSiteOverride"; value: Variant | "off" | "auto" };
+  | { type: "setSiteOverride"; value: SiteChoice | "inherit"; scope?: SiteScope };
+
+export interface SiteRuleEdit {
+  type: "editSiteRule";
+  scope: SiteScope;
+  hostname: string;
+  value: SiteChoice | null;
+  previousHostname?: string;
+}
+
+export interface SiteRuleResult {
+  ok: boolean;
+  error?: string;
+}
 
 export interface ActionStateMessage {
   type: "setActionState";

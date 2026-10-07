@@ -6,6 +6,8 @@
 import { getInstalledFonts, validChoice } from "../settings/font-catalog";
 import { FONT_SETTINGS, LEGACY_PRESERVE_KEYS, preserveWebsiteFontsFromStorage } from "../settings/defaults";
 import type { FontSettingKey } from "../settings/defaults";
+import { isSiteChoice, normalizeHostname, sanitizeSiteOverrides } from "../settings/site-overrides";
+import type { SiteRuleEdit } from "../shared/types";
 import type { ActionStateMessage } from "../shared/types";
 
 const ACTION_ICONS = {
@@ -44,11 +46,6 @@ async function setActionState(tabId: number, active: boolean): Promise<void> {
   }
 }
 
-chrome.runtime.onMessage.addListener((message: unknown, sender) => {
-  if (!isActionStateMessage(message) || sender.tab?.id == null || (sender.frameId ?? 0) !== 0) return;
-  void setActionState(sender.tab.id, message.inUse);
-});
-
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status !== "loading") return;
   // Chromium clears tab-specific action icons on cross-document navigation.
@@ -85,4 +82,67 @@ chrome.runtime.onInstalled.addListener(async () => {
   } catch (error) {
     console.warn("CJ Font Fallback Fix could not initialize its font list:", error);
   }
+});
+
+// Serialize edits across Settings and popup instances; storage owns durable state.
+let siteRuleSaveQueue: Promise<unknown> = Promise.resolve();
+
+async function editSiteRule(edit: SiteRuleEdit): Promise<void> {
+  if (edit.scope !== "hostname" && edit.scope !== "domain") throw new Error("Invalid site scope");
+  if (edit.value !== null && !isSiteChoice(edit.value)) throw new Error("Invalid site choice");
+  const host = normalizeHostname(edit.hostname);
+  if (!host) throw new Error("Invalid hostname");
+  const hostname = edit.scope === "domain" ? chrome.publicSuffix.getDomain(host) : host;
+  if (!hostname) throw new Error("noRegistrableDomain");
+  const key = edit.scope === "domain" ? "siteDomainOverrides" : "siteOverrides";
+  const stored = await chrome.storage.sync.get(key);
+  const rules = sanitizeSiteOverrides(stored[key], true);
+  if (edit.previousHostname && edit.previousHostname !== hostname && Object.hasOwn(rules, hostname)) {
+    throw new Error("siteRuleConflict");
+  }
+  if (edit.previousHostname) delete rules[edit.previousHostname];
+  if (edit.value === null || (edit.scope === "domain" && edit.value === "auto")) delete rules[hostname];
+  else Object.defineProperty(rules, hostname, { value: edit.value, enumerable: true, configurable: true, writable: true });
+  await chrome.storage.sync.set({ [key]: rules });
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (isActionStateMessage(message) && sender.tab?.id != null && (sender.frameId ?? 0) === 0) {
+    void setActionState(sender.tab.id, message.inUse);
+    return false;
+  }
+  if (message?.type === "getSiteDomain") {
+    try {
+      const host = new URL(sender.url || "").hostname;
+      sendResponse(chrome.publicSuffix.getDomain(host) || null);
+    } catch {
+      sendResponse(null);
+    }
+    return false;
+  }
+  if (message?.type !== "editSiteRule" && message?.type !== "clearSiteRules") return false;
+  const previous = siteRuleSaveQueue;
+  const operation = (async () => {
+    try { await previous; } catch { /* A failed edit must not block later edits. */ }
+    if (message.type === "clearSiteRules") {
+      await chrome.storage.sync.set({ siteOverrides: {}, siteDomainOverrides: {} });
+    } else {
+      await editSiteRule(message);
+    }
+  })();
+  siteRuleSaveQueue = operation;
+  void (async () => {
+    try {
+      await operation;
+      sendResponse({ ok: true });
+    } catch (error) {
+      const errorText = error instanceof Error ? error.message : String(error);
+      sendResponse({
+        ok: false,
+        error: errorText,
+        errorKey: ["noRegistrableDomain", "siteRuleConflict"].includes(errorText) ? errorText : undefined
+      });
+    }
+  })();
+  return true;
 });
