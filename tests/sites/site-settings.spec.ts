@@ -30,7 +30,7 @@ async function addRule(page: Page, hostname: string, scope: "hostname" | "domain
   await page.getByRole("button", { name: "Add website", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add website", exact: true });
   await dialog.getByRole("textbox", { name: "Website", exact: true }).fill(hostname);
-  await dialog.getByRole("radio", { name: scope === "domain" ? "Whole domain" : "This hostname", exact: true }).check();
+  await dialog.getByRole("radio", { name: scope === "domain" ? "Include subdomains" : "Website only", exact: true }).check();
   await dialog.getByRole("combobox", { name: "Language", exact: true }).selectOption(language);
   await dialog.getByRole("button", { name: "Add website", exact: true }).click();
   await expect(dialog).toBeHidden();
@@ -84,10 +84,10 @@ test("keeps legacy choices and separates hosted domains in the Settings editor",
   await page.getByRole("button", { name: "Add website", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add website", exact: true });
   await dialog.getByRole("textbox", { name: "Website", exact: true }).fill("localhost");
-  await dialog.getByRole("radio", { name: "Whole domain", exact: true }).check();
+  await dialog.getByRole("radio", { name: "Include subdomains", exact: true }).check();
   await dialog.getByRole("combobox", { name: "Language", exact: true }).selectOption("jp");
   await dialog.getByRole("button", { name: "Add website", exact: true }).click();
-  await expect(dialog.getByRole("alert")).toContainText("no registrable domain");
+  await expect(dialog.getByRole("alert")).toContainText("cannot include subdomains");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.locator("#resetSettings").click();
   await expect(page.locator("#siteRuleCount")).toHaveText("2 rules");
@@ -171,7 +171,7 @@ test("edits a saved hostname into a domain rule and preserves the Hide switch", 
   await page.getByRole("button", { name: "Edit website: www.example.co.uk", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Edit website", exact: true });
   await expect(dialog.getByRole("textbox", { name: "Website", exact: true })).toHaveValue("www.example.co.uk");
-  await dialog.getByRole("radio", { name: "Whole domain", exact: true }).check();
+  await dialog.getByRole("radio", { name: "Include subdomains", exact: true }).check();
   await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("button", { name: "Edit website: example.co.uk", exact: true })).toBeVisible();
@@ -184,7 +184,7 @@ test("edits a saved hostname into a domain rule and preserves the Hide switch", 
   await expect(page.getByRole("button", { name: "Edit website: example.co.uk", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Edit website: example.co.uk", exact: true }).click();
   await dialog.getByRole("textbox", { name: "Website", exact: true }).fill("www.example.co.uk");
-  await dialog.getByRole("radio", { name: "This hostname", exact: true }).check();
+  await dialog.getByRole("radio", { name: "Website only", exact: true }).check();
   await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("button", { name: "Edit website: www.example.co.uk", exact: true })).toBeVisible();
@@ -243,7 +243,7 @@ test("cancels drafts, redirects duplicate additions, and protects scope-move con
   await expect(editDialog).toBeVisible();
   await expect(editDialog.getByRole("combobox", { name: "Language", exact: true })).toHaveValue("jp");
   await expect(editDialog.getByRole("alert")).toContainText("already has a rule");
-  await editDialog.getByRole("radio", { name: "Whole domain", exact: true }).check();
+  await editDialog.getByRole("radio", { name: "Include subdomains", exact: true }).check();
   await editDialog.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(editDialog.getByRole("alert")).toContainText("already exists");
   await editDialog.getByRole("button", { name: "Cancel", exact: true }).click();

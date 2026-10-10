@@ -131,9 +131,13 @@ button.icon-button:hover { background: var(--bg); box-shadow: none; }
 .scope-selector { padding: 0; margin: 14px 0; border: 0; }
 .scope-selector legend { padding: 0; margin-bottom: 7px; font-size: 14px; font-weight: 650; }
 .scope-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.scope-options label { display: flex; align-items: center; gap: 7px; padding: 9px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; }
+.scope-options label { display: flex; align-items: center; gap: 7px; padding: 9px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; transition: border-color 140ms ease, background-color 140ms ease; }
+.scope-options label:has(input:enabled):hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
 .scope-options label:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
+.scope-options label:has(input:enabled:checked):hover { background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
 .scope-options input { margin: 0; accent-color: var(--accent); }
+.scope-options input:focus { outline: none; }
+.scope-options label:has(input:focus-visible) { outline: 3px solid color-mix(in srgb, var(--accent) 28%, transparent); outline-offset: 2px; }
 .scope-options label > span { margin: 0; font-size: 13px; font-weight: 500; }
 .site-dialog-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 18px; }
 .site-dialog-actions > div { display: flex; gap: 8px; margin-left: auto; }
@@ -148,7 +152,7 @@ button.secondary:disabled:hover, button.secondary:disabled:active { background: 
 button.danger:disabled:hover, button.danger:disabled:active { color: #b42318; border-color: color-mix(in srgb, #b42318 35%, var(--line)); }
 
 @media (prefers-reduced-motion: reduce) {
-  button, input[type="text"], select { transition: none; }
+  button, input[type="text"], select, .scope-options label { transition: none; }
   button:active { transform: none; }
   .settings-dialog, .settings-dialog::backdrop { transition-duration: 0s; }
   .site-rule-group::details-content, .site-rule-group > summary::after { transition-duration: 0s; }
