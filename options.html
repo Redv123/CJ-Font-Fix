@@ -93,22 +93,22 @@
       <section class="site-overrides-section settings-section" aria-labelledby="siteOverridesTitle">
         <div class="section-heading">
           <div class="heading-with-count"><h2 id="siteOverridesTitle" data-i18n="siteOverridesTitle">Site language settings</h2><span id="siteRuleCount" class="count" hidden></span></div>
-          <button id="toggleSiteOverrides" class="secondary compact" type="button" aria-expanded="false" aria-controls="siteOverridesPanel" data-i18n="manageSiteOverrides">Manage site language settings</button>
+          <button id="toggleSiteOverrides" class="secondary" type="button" aria-expanded="false" aria-controls="siteOverridesPanel" data-i18n="manageSiteOverrides">Manage site language settings</button>
         </div>
         <div id="siteOverridesPanel" class="site-overrides-panel" hidden>
           <div class="site-toolbar">
             <search><label class="visually-hidden" for="siteRuleSearch" data-i18n="searchWebsites">Search websites</label><input id="siteRuleSearch" type="search" name="search" spellcheck="false"></search>
-            <button id="openAddSite" type="button" class="compact" data-i18n="addSite">Add website</button>
+            <button id="openAddSite" type="button" data-i18n="addSite">Add website</button>
           </div>
           <p id="noSiteOverrides" class="empty-state" data-i18n="noSiteOverrides">No website-specific language settings.</p>
           <div id="siteOverrideList" class="site-override-list"></div>
           <div id="siteDeleteNotice" class="site-delete-notice" hidden>
             <span class="site-delete-icon" aria-hidden="true">✓</span>
             <span id="siteDeleteMessage" role="status"></span>
-            <button id="undoSiteOverrides" class="secondary compact" type="button" data-i18n="undo">Undo</button>
+            <button id="undoSiteOverrides" class="secondary" type="button" data-i18n="undo">Undo</button>
           </div>
           <div class="site-overrides-footer">
-            <button id="clearSiteOverrides" class="secondary compact danger" type="button" data-i18n="clearAllSiteOverrides">Delete all site settings</button>
+            <button id="clearSiteOverrides" class="secondary danger" type="button" data-i18n="clearAllSiteOverrides">Delete all site settings</button>
             <span id="siteOverrideStatus" role="status"></span>
           </div>
         </div>
@@ -116,7 +116,7 @@
       </fieldset>
 
       <div class="actions">
-        <button id="resetSettings" class="secondary compact" type="button" data-i18n="restoreDefaults">Restore defaults</button>
+        <button id="resetSettings" class="secondary" type="button" data-i18n="restoreDefaults">Restore defaults</button>
         <span id="status" role="status"></span>
       </div>
     </div>
@@ -134,7 +134,7 @@
           <option value="sc" data-i18n="simplifiedChinese">Simplified Chinese</option><option value="tc" data-i18n="traditionalChinese">Traditional Chinese</option><option value="jp" data-i18n="japanese">Japanese</option><option value="off" data-i18n="disabled">Disabled</option>
         </select></label>
         <p id="siteRuleError" class="error" role="alert"></p>
-        <div class="site-dialog-actions"><button id="removeSiteRule" type="button" class="secondary compact danger" hidden data-i18n="remove">Remove</button><div><button id="cancelSiteRule" type="button" class="secondary compact" data-i18n="cancel">Cancel</button><button id="saveSiteRule" type="submit" class="compact" data-i18n="addSite">Add website</button></div></div>
+        <div class="site-dialog-actions"><button id="removeSiteRule" type="button" class="secondary danger" hidden data-i18n="remove">Remove</button><div><button id="cancelSiteRule" type="button" class="secondary" data-i18n="cancel">Cancel</button><button id="saveSiteRule" type="submit" data-i18n="addSite">Add website</button></div></div>
       </form>
     </dialog>
 
@@ -142,7 +142,7 @@
       <h2 id="mixedLanguageConsentTitle" data-i18n="mixedLanguageConsentTitle">Enable experimental mixed-language detection?</h2>
       <p id="mixedLanguageConsentBody" data-i18n="mixedLanguageConsentBody">This feature may mistake short passages for another language and change their fonts or layout. Enable it only if you accept that some pages may not look right.</p>
       <form method="dialog" class="settings-dialog-actions">
-        <button class="secondary compact" type="submit" value="cancel" autofocus data-i18n="mixedLanguageConsentCancel">Cancel</button>
+        <button class="secondary" type="submit" value="cancel" autofocus data-i18n="mixedLanguageConsentCancel">Cancel</button>
         <button class="warning-confirm" type="submit" value="enable" data-i18n="mixedLanguageConsentEnable">Enable anyway</button>
       </form>
     </dialog>

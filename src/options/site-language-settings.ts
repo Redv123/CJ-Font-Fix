@@ -158,7 +158,7 @@ export function setupSiteLanguageSettings(): void {
           const button = document.createElement("button");
           button.type = "button";
           button.id = `site-page-${choice}-${direction}`;
-          button.className = "secondary compact";
+          button.className = "secondary";
           button.textContent = message(direction);
           button.disabled = direction === "previous" ? page === 0 : page === lastPage;
           button.addEventListener("click", () => {

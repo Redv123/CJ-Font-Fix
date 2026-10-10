@@ -341,6 +341,11 @@ test("animates Manage and Hide while respecting reduced motion", async () => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   expect(await hasAnimation()).toBe(false);
   await expect(page.locator("#siteOverridesPanel")).toBeVisible();
+  await page.locator("#siteRuleSearch").focus();
+  expect(await page.locator("#siteRuleSearch").evaluate((element) => {
+    getComputedStyle(element).borderTopColor;
+    return element.getAnimations().some((animation) => Number(animation.effect?.getComputedTiming().duration) > 0);
+  })).toBe(false);
   expect(await hasAnimation()).toBe(false);
   await expect(page.locator("#siteOverridesPanel")).toBeHidden();
 });
