@@ -188,6 +188,57 @@ test("preserves unrelated edits from two Settings pages and rejects rename colli
   await expect(page.getByRole("button", { name: "Edit website: second.example.com", exact: true })).toBeVisible();
 });
 
+test("animates deletion and undo locally while respecting reduced motion and Hide", async () => {
+  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
+  await worker.evaluate(() => chrome.storage.sync.set({
+    siteOverrides: { "sc.example.com": "sc", "jp.example.com": "jp", "tc.example.com": "tc" }, siteDomainOverrides: {}
+  }));
+  const page = await context.newPage();
+  try {
+    await page.goto(await worker.evaluate(() => chrome.runtime.getURL("options.html")));
+    await page.locator("#toggleSiteOverrides").click();
+    const sampleAction = (id: string) => page.evaluate(async (buttonId) => {
+      const results = document.getElementById("siteRulesResults")!;
+      (document.getElementById(buttonId) as HTMLButtonElement).click();
+      const frames: { height: number; opacity: number; animations: number }[] = [];
+      const deadline = performance.now() + 4000;
+      do {
+        await new Promise(requestAnimationFrame);
+        frames.push({ height: Math.round(results.getBoundingClientRect().height),
+          opacity: Number(getComputedStyle(results).opacity), animations: results.getAnimations().length });
+        const finished = buttonId === "clearSiteOverrides"
+          ? !document.getElementById("siteDeleteNotice")!.hidden && !(document.getElementById("undoSiteOverrides") as HTMLButtonElement).disabled
+          : document.getElementById("siteDeleteNotice")!.hidden && !(document.getElementById("clearSiteOverrides") as HTMLButtonElement).disabled;
+        if (finished && !results.inert) break;
+      } while (performance.now() < deadline);
+      return frames;
+    }, id);
+    for (const action of ["clearSiteOverrides", "undoSiteOverrides"]) {
+      const frames = await sampleAction(action);
+      expect(frames.some((frame) => frame.opacity > 0 && frame.opacity < 1)).toBe(true);
+      expect(new Set(frames.map((frame) => frame.height)).size).toBeGreaterThan(3);
+      expect(frames.at(-1)?.animations).toBe(0);
+      await expect(page.locator("#siteRulesResults")).toHaveJSProperty("inert", false);
+      await expect(page.locator("#siteRulesResults")).toHaveCSS("overflow", "visible");
+    }
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    for (const action of ["clearSiteOverrides", "undoSiteOverrides"]) {
+      const frames = await sampleAction(action);
+      expect(frames.every((frame) => frame.animations === 0 && frame.opacity === 1)).toBe(true);
+    }
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.locator("#clearSiteOverrides").click();
+    await expect.poll(() => page.locator("#siteRulesResults").evaluate((element) => element.getAnimations().length)).toBeGreaterThan(0);
+    await page.locator("#toggleSiteOverrides").click();
+    await expect(page.locator("#siteOverridesPanel")).toBeHidden();
+    await expect(page.locator("#toggleSiteOverrides")).toBeFocused();
+    await page.locator("#toggleSiteOverrides").click();
+    await expect(page.locator("#undoSiteOverrides")).toBeEnabled();
+    await page.locator("#undoSiteOverrides").click();
+    await expect(page.locator("#siteRuleCount")).toHaveText("3 rules");
+  } finally { await page.close(); }
+});
+
 test("shows intervention details only while correction is active", async () => {
   const worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
   await worker.evaluate(() => chrome.storage.sync.set({

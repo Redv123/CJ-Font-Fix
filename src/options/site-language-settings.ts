@@ -43,8 +43,10 @@ export function setupSiteLanguageSettings(): void {
   const clearButton = byId<HTMLButtonElement>("clearSiteOverrides");
   const undoButton = byId<HTMLButtonElement>("undoSiteOverrides");
   const deleteNotice = byId("siteDeleteNotice");
+  const results = byId("siteRulesResults");
   let deletedRules: SiteRuleSnapshot | null = null;
   let bulkBusy = false;
+  let deferredSiteUpdate = false;
   let returnFocus: HTMLElement | null = null;
   let savedFocusKey = "";
 
@@ -180,6 +182,7 @@ export function setupSiteLanguageSettings(): void {
   }
 
   async function restore(): Promise<void> {
+    deferredSiteUpdate = false;
     const stored = await chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides"]);
     entries = [
       ...Object.entries(sanitizeSiteOverrides(stored.siteOverrides, true)).map(([hostname, choice]) => ({ hostname, choice, scope: "hostname" as const })),
@@ -190,6 +193,48 @@ export function setupSiteLanguageSettings(): void {
       initialized = true;
     }
     render();
+  }
+
+  function managerIsOpen(): boolean {
+    return byId("toggleSiteOverrides").getAttribute("aria-expanded") === "true";
+  }
+
+  async function transitionSiteResults(update: () => Promise<void>): Promise<void> {
+    if (!managerIsOpen() || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      await update();
+      return;
+    }
+    const height = `${results.getBoundingClientRect().height}px`;
+    let incoming: Animation | null = null;
+    results.inert = true;
+    const outgoing = results.animate([
+      { height, opacity: 1 }, { height, opacity: 0 }
+    ], { duration: 90, easing: "ease-out", fill: "forwards" });
+    try {
+      await outgoing.finished;
+      await update();
+      if (managerIsOpen() && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        incoming = results.animate([
+          { height, opacity: 0, transform: "translateY(-4px)", overflow: "hidden" },
+          { height: "auto", opacity: 1, transform: "translateY(0)", overflow: "hidden" }
+        ], { duration: 180, easing: "cubic-bezier(.2, .8, .2, 1)" });
+        outgoing.cancel();
+        await incoming.finished;
+      }
+    } finally {
+      outgoing.cancel();
+      incoming?.cancel();
+      results.inert = false;
+    }
+  }
+
+  function finishBulkOperation(): void {
+    bulkBusy = false;
+    undoButton.disabled = false;
+    clearButton.disabled = entries.length === 0;
+    if (deferredSiteUpdate) {
+      void restore().catch((error: unknown) => showError(message("couldNotLoadSiteOverrides", errorMessage(error))));
+    }
   }
 
   async function persist(edit: SiteRuleEdit): Promise<SiteRuleResult> {
@@ -332,18 +377,18 @@ export function setupSiteLanguageSettings(): void {
       const reply: SiteRuleResult = await chrome.runtime.sendMessage({ type: "clearSiteRules" });
       if (!reply.ok) throw new Error(reply.errorKey ? message(reply.errorKey) : reply.error);
       deletedRules = reply.deletedRules || null;
-      byId("siteDeleteMessage").textContent = message("siteSettingsDeleted");
-      deleteNotice.hidden = !deletedRules;
-      search.value = "";
-      await restore();
+      await transitionSiteResults(async () => {
+        byId("siteDeleteMessage").textContent = message("siteSettingsDeleted");
+        deleteNotice.hidden = !deletedRules;
+        search.value = "";
+        await restore();
+      });
       undoButton.disabled = false;
-      if (deletedRules) undoButton.focus();
+      if (deletedRules && managerIsOpen() && !dialog.open) undoButton.focus();
     } catch (error) {
       showError(message("couldNotSaveSiteOverrides", errorMessage(error)));
     } finally {
-      bulkBusy = false;
-      undoButton.disabled = false;
-      clearButton.disabled = entries.length === 0;
+      finishBulkOperation();
     }
   });
   undoButton.addEventListener("click", async () => {
@@ -356,22 +401,26 @@ export function setupSiteLanguageSettings(): void {
       const reply: SiteRuleResult = await chrome.runtime.sendMessage({ type: "restoreSiteRules", rules: deletedRules });
       if (!reply.ok) throw new Error(reply.errorKey ? message(reply.errorKey) : reply.error);
       deletedRules = null;
-      deleteNotice.hidden = true;
-      byId("siteDeleteMessage").textContent = "";
-      search.value = "";
-      await restore();
+      await transitionSiteResults(async () => {
+        deleteNotice.hidden = true;
+        byId("siteDeleteMessage").textContent = "";
+        search.value = "";
+        await restore();
+      });
       clearButton.disabled = entries.length === 0;
-      (entries.length ? clearButton : byId("openAddSite")).focus();
+      if (managerIsOpen() && !dialog.open) (entries.length ? clearButton : byId("openAddSite")).focus();
     } catch (error) {
       showError(message("couldNotSaveSiteOverrides", errorMessage(error)));
     } finally {
-      bulkBusy = false;
-      undoButton.disabled = false;
-      clearButton.disabled = entries.length === 0;
+      finishBulkOperation();
     }
   });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "sync" && (changes.siteOverrides || changes.siteDomainOverrides)) {
+      if (bulkBusy) {
+        deferredSiteUpdate = true;
+        return;
+      }
       void restore().catch((error: unknown) => showError(message("couldNotLoadSiteOverrides", errorMessage(error))));
     }
   });

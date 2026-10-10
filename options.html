@@ -100,12 +100,14 @@
             <search><label class="visually-hidden" for="siteRuleSearch" data-i18n="searchWebsites">Search websites</label><input id="siteRuleSearch" type="search" name="search" spellcheck="false"></search>
             <button id="openAddSite" type="button" data-i18n="addSite">Add website</button>
           </div>
-          <p id="noSiteOverrides" class="empty-state" data-i18n="noSiteOverrides">No website-specific language settings.</p>
-          <div id="siteOverrideList" class="site-override-list"></div>
-          <div id="siteDeleteNotice" class="site-delete-notice" hidden>
-            <span class="site-delete-icon" aria-hidden="true">✓</span>
-            <span id="siteDeleteMessage" role="status"></span>
-            <button id="undoSiteOverrides" class="secondary" type="button" data-i18n="undo">Undo</button>
+          <div id="siteRulesResults" class="site-rules-results">
+            <p id="noSiteOverrides" class="empty-state" data-i18n="noSiteOverrides">No website-specific language settings.</p>
+            <div id="siteOverrideList" class="site-override-list"></div>
+            <div id="siteDeleteNotice" class="site-delete-notice" hidden>
+              <span class="site-delete-icon" aria-hidden="true">✓</span>
+              <span id="siteDeleteMessage" role="status"></span>
+              <button id="undoSiteOverrides" class="secondary" type="button" data-i18n="undo">Undo</button>
+            </div>
           </div>
           <div class="site-overrides-footer">
             <button id="clearSiteOverrides" class="secondary danger" type="button" data-i18n="clearAllSiteOverrides">Delete all site settings</button>
