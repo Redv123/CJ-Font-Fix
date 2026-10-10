@@ -101,10 +101,12 @@ dd { margin: 0; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
 .site-toolbar button { flex: none; min-height: 36px; padding: 7px 12px; }
 .empty-state { margin: 14px 0; padding: 13px; border-radius: 9px; background: var(--bg); color: var(--muted); }
 .site-override-list { display: grid; gap: 9px; }
-.site-rule-group { border: 1px solid var(--line); border-radius: 9px; }
+.site-rule-group { border: 1px solid var(--line); border-radius: 9px; interpolate-size: allow-keywords; }
+.site-rule-group::details-content { block-size: 0; opacity: 0; overflow: clip; transition: block-size 180ms ease, opacity 180ms ease, content-visibility 180ms ease allow-discrete; }
+.site-rule-group[open]::details-content { block-size: auto; opacity: 1; }
 .site-rule-group > summary { display: flex; align-items: center; gap: 7px; padding: 12px 14px; list-style: none; cursor: pointer; color: var(--accent); font-size: 15px; font-weight: 650; }
 .site-rule-group > summary::-webkit-details-marker { display: none; }
-.site-rule-group > summary::after { content: ""; width: 7px; height: 7px; margin-left: auto; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(-45deg); }
+.site-rule-group > summary::after { content: ""; width: 7px; height: 7px; margin-left: auto; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(-45deg); transition: transform 180ms ease; }
 .site-rule-group[open] > summary::after { transform: rotate(45deg); }
 .site-rule-group > summary .count::before { content: "· "; }
 .site-rule-items { margin: 0; padding: 0 8px 8px; list-style: none; }
@@ -149,6 +151,7 @@ button.danger:disabled:hover, button.danger:disabled:active { color: #b42318; bo
   button, input[type="text"], select { transition: none; }
   button:active { transform: none; }
   .settings-dialog, .settings-dialog::backdrop { transition-duration: 0s; }
+  .site-rule-group::details-content, .site-rule-group > summary::after { transition-duration: 0s; }
   .settings-dialog { transform: none; }
   .settings-dialog[open] { transform: none; }
 }
