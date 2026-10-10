@@ -92,7 +92,7 @@
 
       <section class="site-overrides-section settings-section" aria-labelledby="siteOverridesTitle">
         <div class="section-heading">
-          <div class="heading-with-count"><h2 id="siteOverridesTitle" data-i18n="siteOverridesTitle">Site language settings</h2><span id="siteRuleCount" class="count"></span></div>
+          <div class="heading-with-count"><h2 id="siteOverridesTitle" data-i18n="siteOverridesTitle">Site language settings</h2><span id="siteRuleCount" class="count" hidden></span></div>
           <button id="toggleSiteOverrides" class="secondary compact" type="button" aria-expanded="false" aria-controls="siteOverridesPanel" data-i18n="manageSiteOverrides">Manage site language settings</button>
         </div>
         <div id="siteOverridesPanel" class="site-overrides-panel" hidden>
@@ -103,7 +103,7 @@
           <p id="noSiteOverrides" class="empty-state" data-i18n="noSiteOverrides">No website-specific language settings.</p>
           <div id="siteOverrideList" class="site-override-list"></div>
           <div class="site-overrides-footer">
-            <button id="clearSiteOverrides" class="text-action danger" type="button" data-i18n="clearAllSiteOverrides">Delete all site settings</button>
+            <button id="clearSiteOverrides" class="secondary compact danger" type="button" data-i18n="clearAllSiteOverrides">Delete all site settings</button>
             <span id="siteOverrideStatus" role="status"></span>
           </div>
         </div>
@@ -125,11 +125,11 @@
           <label><input id="siteScopeDomain" type="radio" name="siteScope" value="domain"><span data-i18n="domainScope">Whole domain</span></label>
         </div></fieldset>
         <label class="dialog-field" for="newSiteVariant"><span data-i18n="language">Language</span><select id="newSiteVariant" name="language" required>
-          <option value="" disabled selected data-i18n="chooseLanguage">Choose language</option>
+          <option value="" disabled selected hidden data-i18n="chooseLanguage">Choose language</option>
           <option value="sc" data-i18n="simplifiedChinese">Simplified Chinese</option><option value="tc" data-i18n="traditionalChinese">Traditional Chinese</option><option value="jp" data-i18n="japanese">Japanese</option><option value="off" data-i18n="disabled">Disabled</option>
         </select></label>
         <p id="siteRuleError" class="error" role="alert"></p>
-        <div class="site-dialog-actions"><button id="removeSiteRule" type="button" class="text-action danger" hidden data-i18n="remove">Remove</button><div><button id="cancelSiteRule" type="button" class="secondary compact" data-i18n="cancel">Cancel</button><button id="saveSiteRule" type="submit" class="compact" data-i18n="addSite">Add website</button></div></div>
+        <div class="site-dialog-actions"><button id="removeSiteRule" type="button" class="secondary compact danger" hidden data-i18n="remove">Remove</button><div><button id="cancelSiteRule" type="button" class="secondary compact" data-i18n="cancel">Cancel</button><button id="saveSiteRule" type="submit" class="compact" data-i18n="addSite">Add website</button></div></div>
       </form>
     </dialog>
 

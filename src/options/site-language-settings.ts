@@ -36,6 +36,7 @@ export function setupSiteLanguageSettings(): void {
   const form = byId<HTMLFormElement>("addSiteOverride");
   const hostnameInput = byId<HTMLInputElement>("newSiteHostname");
   const languageSelect = byId<HTMLSelectElement>("newSiteVariant");
+  const languagePlaceholder = languageSelect.querySelector<HTMLOptionElement>('option[value=""]')!;
   const saveButton = byId<HTMLButtonElement>("saveSiteRule");
   const removeButton = byId<HTMLButtonElement>("removeSiteRule");
   const search = byId<HTMLInputElement>("siteRuleSearch");
@@ -63,6 +64,8 @@ export function setupSiteLanguageSettings(): void {
     if (!dialog.open) returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     form.reset();
     hostnameInput.value = entry?.hostname || "";
+    if (entry && isSiteOverride(entry.choice)) languagePlaceholder.remove();
+    else languageSelect.prepend(languagePlaceholder);
     languageSelect.value = entry && isSiteOverride(entry.choice) ? entry.choice : "";
     byId<HTMLInputElement>(entry?.scope === "domain" ? "siteScopeDomain" : "siteScopeHostname").checked = true;
     byId("siteRuleDialogTitle").textContent = message(entry ? "editWebsite" : "addSite");
@@ -257,6 +260,9 @@ export function setupSiteLanguageSettings(): void {
   });
 
   byId("openAddSite").addEventListener("click", () => openEditor(null));
+  languageSelect.addEventListener("change", () => {
+    if (isSiteOverride(languageSelect.value)) languagePlaceholder.remove();
+  });
   for (const id of ["closeSiteRule", "cancelSiteRule"]) byId(id).addEventListener("click", () => dialog.close());
   dialog.addEventListener("cancel", (event) => {
     if (saveButton.disabled) event.preventDefault();
@@ -280,6 +286,7 @@ export function setupSiteLanguageSettings(): void {
     panelAnimation?.cancel();
     panelAnimation = null;
     button.setAttribute("aria-expanded", String(expanding));
+    byId("siteRuleCount").hidden = !expanding;
     button.textContent = message(expanding ? "hideSiteOverrides" : "manageSiteOverrides");
 
     if (reduceMotion) {
