@@ -298,12 +298,12 @@ export function setupSiteLanguageSettings(): void {
     const animation = panel.animate(
       expanding
         ? [
-          { maxHeight: "0px", opacity: 0, transform: "translateY(-6px)" },
-          { maxHeight: `${height}px`, opacity: 1, transform: "translateY(0)" }
+          { maxHeight: "0px", opacity: 0, transform: "translateY(-6px)", overflow: "hidden" },
+          { maxHeight: `${height}px`, opacity: 1, transform: "translateY(0)", overflow: "hidden" }
         ]
         : [
-          { maxHeight: `${height}px`, opacity: 1, transform: "translateY(0)" },
-          { maxHeight: "0px", opacity: 0, transform: "translateY(-6px)" }
+          { maxHeight: `${height}px`, opacity: 1, transform: "translateY(0)", overflow: "hidden" },
+          { maxHeight: "0px", opacity: 0, transform: "translateY(-6px)", overflow: "hidden" }
         ],
       { duration: 180, easing: "cubic-bezier(.2, .8, .2, 1)" }
     );

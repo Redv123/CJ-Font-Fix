@@ -95,7 +95,7 @@ dd { margin: 0; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
 .heading-with-count h2 { margin: 0; font-size: 20px; }
 .count { color: var(--muted); font-size: 13px; font-weight: 500; }
 .site-overrides-section { margin: 24px 0; padding-top: 22px; border-top: 1px solid var(--line); }
-.site-overrides-panel { margin-top: 16px; transform-origin: top; overflow: hidden; }
+.site-overrides-panel { margin-top: 16px; transform-origin: top; }
 .site-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .site-toolbar search { flex: 1; min-width: 0; }
 .site-toolbar button { flex: none; min-height: 36px; padding: 7px 12px; }
