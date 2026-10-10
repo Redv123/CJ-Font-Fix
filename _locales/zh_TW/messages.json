@@ -1,5 +1,6 @@
 {
-  "siteSearchCount": { "message": "共 $2 條，找到 $1 條" },
+  "siteSearchCount": { "message": "共 $2 條規則，找到 $1 條規則" },
+  "siteSearchCountOne": { "message": "共 $2 條規則，找到 $1 條規則" },
   "noMatchingWebsites": { "message": "沒有符合的網站。" },
   "siteGroupPages": { "message": "$1 分頁" },
   "sitePageRange": { "message": "$1–$2 / $3" },
@@ -10,8 +11,9 @@
   "cancel": { "message": "取消" },
   "close": { "message": "關閉" },
   "editWebsiteNamed": { "message": "編輯網站：$1" },
-  "siteLanguageGroup": { "message": "$1 規則" },
+  "siteLanguageGroup": { "message": "$1規則分組" },
   "siteRuleCount": { "message": "$1 條規則" },
+  "siteRuleCountOne": { "message": "$1 條規則" },
   "automaticSiteChoices": { "message": "自動偵測" },
   "searchWebsites": { "message": "搜尋網站" },
   "siteAlreadyExists": { "message": "此網站已有規則，可在此編輯。" },

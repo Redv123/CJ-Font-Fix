@@ -1,5 +1,6 @@
 {
-  "siteSearchCount": { "message": "$2 件中 $1 件" },
+  "siteSearchCount": { "message": "$2 件の設定のうち $1 件の設定" },
+  "siteSearchCountOne": { "message": "$2 件の設定のうち $1 件の設定" },
   "noMatchingWebsites": { "message": "一致するサイトはありません。" },
   "siteGroupPages": { "message": "$1 のページ" },
   "sitePageRange": { "message": "$3 件中 $1–$2 件" },
@@ -12,6 +13,7 @@
   "editWebsiteNamed": { "message": "サイトを編集: $1" },
   "siteLanguageGroup": { "message": "$1 の設定" },
   "siteRuleCount": { "message": "$1 件の設定" },
+  "siteRuleCountOne": { "message": "$1 件の設定" },
   "automaticSiteChoices": { "message": "自動検出" },
   "searchWebsites": { "message": "サイトを検索" },
   "siteAlreadyExists": { "message": "このサイトにはすでに設定があります。ここで編集できます。" },

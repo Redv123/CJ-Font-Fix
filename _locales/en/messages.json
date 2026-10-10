@@ -1,5 +1,6 @@
 {
   "siteSearchCount": { "message": "$1 of $2 rules" },
+  "siteSearchCountOne": { "message": "$1 of $2 rule" },
   "noMatchingWebsites": { "message": "No matching websites." },
   "siteGroupPages": { "message": "$1 pages" },
   "sitePageRange": { "message": "$1–$2 of $3" },
@@ -12,6 +13,7 @@
   "editWebsiteNamed": { "message": "Edit website: $1" },
   "siteLanguageGroup": { "message": "$1 rules" },
   "siteRuleCount": { "message": "$1 rules" },
+  "siteRuleCountOne": { "message": "$1 rule" },
   "automaticSiteChoices": { "message": "Automatic detection" },
   "searchWebsites": { "message": "Search websites" },
   "siteAlreadyExists": { "message": "This website already has a rule. You can edit it here." },

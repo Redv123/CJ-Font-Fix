@@ -81,8 +81,8 @@ export function setupSiteLanguageSettings(): void {
     const normalizedQuery = normalizeHostname(query) || query;
     const matches = entries.filter((entry) => !query || entry.hostname.includes(query) || entry.hostname.includes(normalizedQuery));
     byId("siteRuleCount").textContent = query
-      ? message("siteSearchCount", [String(matches.length), String(entries.length)])
-      : message("siteRuleCount", String(entries.length));
+      ? message(entries.length === 1 ? "siteSearchCountOne" : "siteSearchCount", [String(matches.length), String(entries.length)])
+      : message(entries.length === 1 ? "siteRuleCountOne" : "siteRuleCount", String(entries.length));
     byId("noSiteOverrides").hidden = matches.length > 0;
     byId("noSiteOverrides").textContent = message(query ? "noMatchingWebsites" : "noSiteOverrides");
     byId<HTMLButtonElement>("clearSiteOverrides").disabled = entries.length === 0;
@@ -99,7 +99,9 @@ export function setupSiteLanguageSettings(): void {
       title.textContent = groupLabel(choice);
       const count = document.createElement("span");
       count.className = "count";
-      count.textContent = query ? `${members.length} / ${entries.filter((entry) => entry.choice === choice).length}` : String(members.length);
+      const groupTotal = entries.filter((entry) => entry.choice === choice).length;
+      count.textContent = message(groupTotal === 1 ? "siteRuleCountOne" : "siteRuleCount",
+        query ? `${members.length} / ${groupTotal}` : String(members.length));
       heading.append(title, count);
       group.append(heading);
       group.addEventListener("toggle", () => {
