@@ -25,7 +25,6 @@ interface PageObserverDependencies {
   managedStyles: ManagedStyles;
   mixedLanguage: MixedLanguage;
   simpleMode: SimpleMode;
-  openShadowRoots: Set<ShadowRoot>;
   requestRun: () => void;
 }
 
@@ -45,12 +44,11 @@ export class PageObserver {
   constructor(private readonly dependencies: PageObserverDependencies) {}
 
   configure(): void {
-    const { settings, simpleMode, openShadowRoots } = this.dependencies;
+    const { settings, simpleMode } = this.dependencies;
     this.observer?.disconnect();
     this.observer = null;
     simpleMode.stopBootstrap();
     this.observedShadowRoots = new WeakSet();
-    openShadowRoots.clear();
     document.removeEventListener("input", this.handleInput, true);
 
     const current = settings();
@@ -348,7 +346,6 @@ export class PageObserver {
       if (!this.observedShadowRoots.has(shadowRoot)) {
         this.observer?.observe(shadowRoot, this.options(dynamic));
         this.observedShadowRoots.add(shadowRoot);
-        this.dependencies.openShadowRoots.add(shadowRoot);
       }
       for (const nested of shadowRoot.querySelectorAll("*")) visit(nested);
     };

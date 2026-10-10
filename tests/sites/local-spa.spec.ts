@@ -495,3 +495,153 @@ test("uses the current website stack when repeated text elements change style", 
     await page.close();
   }
 });
+
+test("repairs newly inserted shadow hosts and restores their inline fonts", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({ fontSC: "CJ Test Sans", preserveWebsiteFonts: false,
+      dynamicDetection: true, siteOverrides: { "fixture.test": "sc" } });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/new-shadow-host", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: "<html><body><main><p>原有中文内容</p></main></body></html>"
+    }));
+    await page.goto("https://fixture.test/new-shadow-host");
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(1);
+    // Let startup font metadata settle before inserting a purely local subtree.
+    await page.waitForTimeout(400);
+    await page.evaluate(() => {
+      const host = document.createElement("div");
+      host.id = "new-shadow-host";
+      const shadow = host.attachShadow({ mode: "open" });
+      shadow.innerHTML = '<p id="shadow-prose" style="font-family: serif !important">新增中文内容</p><div id="nested-host"></div>';
+      shadow.querySelector("#nested-host")!.attachShadow({ mode: "open" }).innerHTML = '<p id="nested-prose">嵌套中文内容</p>';
+      document.querySelector("main")!.append(host);
+    });
+    const prose = page.locator("#shadow-prose");
+    await expect.poll(() => prose.evaluate((element) => getComputedStyle(element).fontFamily)).toContain("CJ Test Sans");
+    await expect.poll(() => page.locator("#nested-prose").evaluate((element) => getComputedStyle(element).fontFamily)).toContain("CJ Test Sans");
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(3);
+
+    const host = (await page.locator("#new-shadow-host").elementHandle())!;
+    await host.evaluate((element) => element.remove());
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(1);
+    expect(await host.evaluate((element) => (element.shadowRoot!.querySelector("#shadow-prose") as HTMLElement).style.fontFamily)).toBe("serif");
+    await host.evaluate((element) => document.querySelector("main")!.append(element));
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(3);
+    await prose.evaluate((element) => { element.firstChild!.nodeValue = "English text only"; });
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(2);
+    await prose.evaluate((element) => { element.firstChild!.nodeValue = "重新插入后的中文内容"; });
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(3);
+    await host.dispose();
+
+    // Website edits must still be captured after the extension's write batch.
+    await prose.evaluate((element) => (element as HTMLElement).style.setProperty("font-family", '"Site Updated", sans-serif', "important"));
+    await expect.poll(() => prose.evaluate((element) => getComputedStyle(element).fontFamily)).toContain("Site Updated");
+    await expect.poll(() => prose.evaluate((element) => getComputedStyle(element).fontFamily)).toContain("CJ Test Sans");
+    await worker.evaluate(() => chrome.storage.sync.set({ siteOverrides: { "fixture.test": "off" } }));
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(0);
+    expect(await prose.evaluate((element) => (element as HTMLElement).style.getPropertyValue("font-family"))).toBe('"Site Updated", sans-serif');
+    expect(await prose.evaluate((element) => (element as HTMLElement).style.getPropertyPriority("font-family"))).toBe("important");
+    expect(await page.locator("#nested-prose").evaluate((element) => (element as HTMLElement).style.fontFamily)).toBe("");
+  } finally {
+    await page.close();
+  }
+});
+
+test("ignores unrelated site rules while applying effective rule and global font changes", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({ fontSC: "CJ Test Simplified", fontTC: "CJ Test Traditional",
+      preserveWebsiteFonts: false, dynamicDetection: true,
+      siteOverrides: { "news.example.com": "sc" }, siteDomainOverrides: { "example.com": "jp" } });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://news.example.com/settings-changes", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: "<html><body><main><p id='prose'>中文内容</p></main></body></html>"
+    }));
+    await page.goto("https://news.example.com/settings-changes");
+    await page.bringToFront();
+    const family = () => page.locator("#prose").evaluate((element) => getComputedStyle(element).fontFamily);
+    await expect.poll(family).toContain("CJ Test Simplified");
+    await page.waitForTimeout(400);
+    await page.evaluate(() => {
+      const prose = document.querySelector("#prose")!;
+      prose.setAttribute("data-test-style-writes", "0");
+      let writes = 0;
+      new MutationObserver((records) => {
+        writes += records.length;
+        prose.setAttribute("data-test-style-writes", String(writes));
+      }).observe(prose, { attributes: true, attributeFilter: ["style", "data-cjk-fallback-stack"] });
+    });
+    await worker.evaluate(() => chrome.storage.sync.set({
+      siteOverrides: { "news.example.com": "sc", "unrelated.test": "jp" },
+      siteDomainOverrides: { "example.com": "tc", "unrelated.com": "off" }
+    }));
+    await page.waitForTimeout(400);
+    expect(await page.locator("#prose").getAttribute("data-test-style-writes")).toBe("0");
+    expect(await family()).toContain("CJ Test Simplified");
+
+    // Removing the exact rule must use the domain choice saved above.
+    await worker.evaluate(() => chrome.storage.sync.set({ siteOverrides: { "unrelated.test": "jp" } }));
+    await expect.poll(family).toContain("CJ Test Traditional");
+    await worker.evaluate(() => chrome.storage.sync.set({ siteDomainOverrides: { "example.com": "off" } }));
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(0);
+    await worker.evaluate(() => chrome.storage.sync.set({ siteDomainOverrides: { "example.com": "sc" } }));
+    await expect.poll(family).toContain("CJ Test Simplified");
+
+    // A combined notification must still honor the global font change.
+    await worker.evaluate(() => chrome.storage.sync.set({ fontSC: "CJ Test Updated",
+      siteOverrides: { "another.test": "tc" } }));
+    await expect.poll(family).toContain("CJ Test Updated");
+  } finally {
+    await page.close();
+  }
+});
+
+test("restores non-CJK descendants across light and shadow trees without changing other regions", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({ fontSC: "CJ Test Sans", preserveWebsiteFonts: false,
+      dynamicDetection: true, siteOverrides: { "fixture.test": "sc" } });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/affected-regions", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<html><head><style>body { font-family: "Site Latin", sans-serif; }</style></head><body>
+        <main><section id="region"><p id="light-prose">局部中文内容</p><div id="shadow-host"></div></section>
+        <section><p id="outside">区域外的中文内容</p></section></main>
+        <script>document.querySelector('#shadow-host').attachShadow({mode:'open'}).innerHTML =
+          '<p id="shadow-prose">影子树中文内容</p><div id="deep-host"></div>';
+        document.querySelector('#shadow-host').shadowRoot.querySelector('#deep-host').attachShadow({mode:'open'}).innerHTML =
+          '<p id="deep-prose">嵌套影子树中文内容</p>';</script>
+      </body></html>`
+    }));
+    await page.goto("https://fixture.test/affected-regions");
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(4);
+    const family = (id: string) => page.locator(`#${id}`).evaluate((element) => getComputedStyle(element).fontFamily);
+    await page.evaluate(() => {
+      document.querySelector("#light-prose")!.firstChild!.nodeValue = "English only";
+      const shadow = document.querySelector("#shadow-host")!.shadowRoot!;
+      shadow.querySelector("#shadow-prose")!.firstChild!.nodeValue = "English only";
+      shadow.querySelector("#deep-host")!.shadowRoot!.querySelector("#deep-prose")!.firstChild!.nodeValue = "English only";
+      document.querySelector("#region")!.classList.add("changed");
+    });
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(1);
+    for (const id of ["light-prose", "shadow-prose", "deep-prose"]) expect(await family(id)).not.toContain("CJ Test Sans");
+    expect(await family("outside")).toContain("CJ Test Sans");
+    // Changing the document-wide stack still revisits every managed descendant.
+    await page.locator("body").evaluate((element) => (element as HTMLElement).style.fontFamily = '"Site Updated", sans-serif');
+    await expect.poll(() => family("outside")).toContain("Site Updated");
+    expect(await family("outside")).toContain("CJ Test Sans");
+  } finally {
+    await page.close();
+  }
+});

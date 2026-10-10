@@ -35,9 +35,8 @@ export class ManagedStyles {
   private readonly elements = new Set<HTMLElement>();
   private readonly variantCounts = new Map<Variant, number>();
   private readonly fontCounts = new Map<string, number>();
-  private readonly selfMutatedElements = new WeakSet<Node>();
-
-  constructor(private readonly releaseShadowRoot: (root: ShadowRoot) => void) {}
+  private selfMutatedElements = new WeakSet<Node>();
+  private selfMutationTimer: ReturnType<typeof setTimeout> | null = null;
 
   get(element: HTMLElement): AppliedStyleState | undefined {
     return this.states.get(element);
@@ -72,7 +71,6 @@ export class ManagedStyles {
   /** Remove our prior attachment so computed style reflects the website. */
   prepareForRead(element: HTMLElement, state: AppliedStyleState | undefined): void {
     if (!state) return;
-    this.markSelfMutation(element);
     if (state.inlineFallback) this.restoreInlineFamily(element, state);
     else element.removeAttribute(this.rules.stackAttribute);
   }
@@ -82,8 +80,29 @@ export class ManagedStyles {
     // Direct-only changes cannot affect managed elements outside this list.
     if (!roots.length) return new Set(elements.filter((element) => this.elements.has(element)));
     const direct = new Set(elements);
-    const rootSet = new Set(roots);
     const affected = new Set<HTMLElement>();
+    if (roots.length === 1) {
+      const root = roots[0]!;
+      for (const element of this.elements) {
+        if (direct.has(element)) {
+          affected.add(element);
+          continue;
+        }
+        // Native containment handles the light tree in one check. It does not
+        // cross shadow roots, so check their hosts up to the document tree.
+        let current: Element | null = element;
+        while (current) {
+          if (root.contains(current)) {
+            affected.add(element);
+            break;
+          }
+          const tree = current.getRootNode();
+          current = tree instanceof ShadowRoot ? tree.host : null;
+        }
+      }
+      return affected;
+    }
+    const rootSet = new Set(roots);
     for (const element of this.elements) {
       if (direct.has(element)) {
         affected.add(element);
@@ -118,7 +137,6 @@ export class ManagedStyles {
     } else {
       const ruleId = this.rules.acquire(action.appliedValue);
       state.groupValue = action.appliedValue;
-      this.markSelfMutation(action.element);
       action.element.setAttribute(this.rules.stackAttribute, ruleId);
     }
     this.states.set(action.element, state);
@@ -153,7 +171,6 @@ export class ManagedStyles {
       }
     }
     this.states.delete(element);
-    this.markSelfMutation(element);
     element.removeAttribute(this.rules.stackAttribute);
     this.elements.delete(element);
   }
@@ -171,7 +188,6 @@ export class ManagedStyles {
         released = true;
       }
       if (root instanceof Element && root.shadowRoot) {
-        this.releaseShadowRoot(root.shadowRoot);
         release(root.shadowRoot);
       }
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
@@ -181,7 +197,6 @@ export class ManagedStyles {
           released = true;
         }
         if (element instanceof Element && element.shadowRoot) {
-          this.releaseShadowRoot(element.shadowRoot);
           release(element.shadowRoot);
         }
       }
@@ -204,7 +219,13 @@ export class ManagedStyles {
 
   private markSelfMutation(element: Node): void {
     this.selfMutatedElements.add(element);
-    setTimeout(() => this.selfMutatedElements.delete(element), 0);
+    if (this.selfMutationTimer !== null) return;
+    // Mutation delivery happens before the next timer task. Keep every inline
+    // write in this batch suppressed without retaining nodes in a strong Set.
+    this.selfMutationTimer = setTimeout(() => {
+      this.selfMutatedElements = new WeakSet();
+      this.selfMutationTimer = null;
+    }, 0);
   }
 
   private restoreInlineFamily(element: HTMLElement, state: AppliedStyleState): void {

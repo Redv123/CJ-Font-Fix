@@ -69,7 +69,12 @@ export function collectCandidateElements(
   if (!isFragment && (!(root instanceof Element) || !isInsideBody(root))) return candidates;
   if (isFragment && !isInsideBody(root.host)) return candidates;
 
-  if (root instanceof Element) addCandidate(candidates, root);
+  if (root instanceof Element) {
+    if (closestComposed(root, EXCLUDED)) return candidates;
+    addCandidate(candidates, root);
+    // nextNode() starts at descendants, so visit the root host's shadow too.
+    if (root.shadowRoot) collectCandidateElements(root.shadowRoot, candidates);
+  }
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       if (node instanceof Element) {

@@ -1,4 +1,4 @@
-import { currentSiteDomain, getSiteOverride, initializeSiteDomain } from "../settings/site-overrides";
+import { currentSiteDomain, getSiteOverride, initializeSiteDomain, sanitizeSiteOverrides } from "../settings/site-overrides";
 import { FallbackController } from "../fallback/controller";
 import { ManagedStyles } from "../fallback/managed-styles";
 import { MixedLanguage } from "../fallback/mixed-language";
@@ -28,8 +28,7 @@ function startContentApplication(): void {
 
   const updates = new UpdateQueue();
   const fontSupport = new FontSupport();
-  const openShadowRoots = new Set<ShadowRoot>();
-  const managedStyles = new ManagedStyles((root) => openShadowRoots.delete(root));
+  const managedStyles = new ManagedStyles();
   const fontStackRules = managedStyles.rules;
 
   let settings: Settings = { ...DEFAULTS };
@@ -71,7 +70,6 @@ function startContentApplication(): void {
     managedStyles,
     mixedLanguage,
     simpleMode,
-    openShadowRoots,
     requestRun: requestRunForQueuedWork
   });
 
@@ -235,18 +233,21 @@ function startContentApplication(): void {
 
   chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area !== "sync") return;
-    if (Object.keys(changes).length === 1 && changes.siteOverrides &&
-        JSON.stringify(changes.siteOverrides.newValue || {}) === JSON.stringify(settings.siteOverrides || {})) {
-      return;
-    }
-    if (!Object.keys(changes).some((key) => key in DEFAULTS)) return;
+    const changedKeys = Object.keys(changes).filter((key) => key in DEFAULTS);
+    if (!changedKeys.length) return;
+    const previousSiteChoice = getSiteOverride(settings);
     for (const [key, change] of Object.entries(changes)) {
       if (!(key in DEFAULTS)) continue;
       const settingKey = key as keyof Settings;
       const value = change.newValue === undefined ? DEFAULTS[settingKey] : change.newValue;
       (settings as unknown as Record<string, unknown>)[key] = value;
     }
-    settings.siteOverrides = settings.siteOverrides || {};
+    settings.siteOverrides = sanitizeSiteOverrides(settings.siteOverrides, true);
+    settings.siteDomainOverrides = sanitizeSiteOverrides(settings.siteDomainOverrides);
+    // Keep the maps current so deleting a hostname exception later inherits
+    // the newest domain choice, without rescanning unrelated pages now.
+    if (changedKeys.every((key) => key === "siteOverrides" || key === "siteDomainOverrides") &&
+        getSiteOverride(settings) === previousSiteChoice) return;
     fontSupport.clearAvailability();
     pageObserver.configure();
     requestFullScan(true);
