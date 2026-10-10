@@ -307,6 +307,7 @@ test("shows intervention details only while correction is active", async () => {
   await site.bringToFront();
   await popup.reload();
   await expect(popup.locator("#site")).toHaveText("example.net");
+  await expect(popup.locator("#pageIcon")).toHaveAttribute("src", /icon-inactive-128\.png$/);
   for (const id of ["fontRow", "interventionRow", "managedRow"]) {
     await expect(popup.locator(`#${id}`)).toBeHidden();
   }
@@ -318,16 +319,24 @@ test("shows intervention details only while correction is active", async () => {
   }
   await expect(popup.locator("#font")).toHaveText("CJ Test Sans");
   await expect(popup.locator("#changed")).toHaveText("1");
+  await expect(popup.locator("#pageIcon")).toHaveAttribute("src", /icon-active-128\.png$/);
   await popup.locator("#override").selectOption("off");
   for (const id of ["fontRow", "interventionRow", "managedRow"]) {
     await expect(popup.locator(`#${id}`)).toBeHidden();
   }
+  await expect(popup.locator("#pageIcon")).toHaveAttribute("src", /icon-inactive-128\.png$/);
   await worker.evaluate(() => chrome.storage.sync.set({ simpleMode: true }));
   await popup.locator("#override").selectOption("sc");
   await expect(popup.locator("#interventionRow")).toBeVisible();
   await expect(popup.locator("#interventionLabel")).toHaveText("Applied lang");
   await expect(popup.locator("#fontRow")).toBeHidden();
   await expect(popup.locator("#managedRow")).toBeHidden();
+  await expect(popup.locator("#pageIcon")).toHaveAttribute("src", /icon-active-128\.png$/);
+  await site.goto("chrome://version/");
+  await site.bringToFront();
+  await popup.reload();
+  await expect(popup.locator("#unavailableState")).toBeVisible();
+  await expect(popup.locator("#pageIcon")).toHaveAttribute("src", /icon-inactive-128\.png$/);
 });
 
 test("edits a saved hostname into a domain rule and preserves the Hide switch", async () => {

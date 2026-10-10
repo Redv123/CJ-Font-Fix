@@ -73,6 +73,7 @@ async function load(): Promise<void> {
     const inUse = status.siteOverride !== "off" && (status.simpleMode
       ? Boolean(status.simpleLang)
       : changedElements > 0);
+    byId<HTMLImageElement>("pageIcon").src = `icons/icon-${inUse ? "active" : "inactive"}-128.png`;
     byId("statusGrid").classList.toggle("simple-status", status.simpleMode);
     byId("statusGrid").classList.toggle("inactive-status", !inUse);
     byId("fontRow").hidden = status.simpleMode || !inUse;
@@ -91,6 +92,7 @@ async function load(): Promise<void> {
     byId("changed").textContent = String(changedElements);
     byId<HTMLSelectElement>("override").value = status.hostnameChoice || status.siteOverride || "auto";
   } catch {
+    byId<HTMLImageElement>("pageIcon").src = "icons/icon-inactive-128.png";
     byId("site").textContent = message("notEnabledOnPage");
     byId("statusGrid").hidden = true;
     byId("siteControls").hidden = true;
