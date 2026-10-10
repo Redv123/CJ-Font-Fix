@@ -23,7 +23,7 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 | Store the simplified and traditional clue sets | `src/language/chinese-clues.ts` | `SC_CLUES`, `TC_CLUES` |
 | Store conservative Japanese character clues | `src/language/japanese-character-clues.ts` | `JAPANESE_CHARACTER_CLUES` |
 | Select the page sample and final page variant | `src/page/page-language.ts` | `PageLanguageDetector.collectSample()`, `detect()` |
-| Decide whether a DOM change touches the sample | `src/page/page-language.ts` | `touchesSample()`, `sampleRootWasRemoved()` |
+| Decide whether a DOM change touches or replaces the sample | `src/page/page-language.ts` | `touchesSample()`, `sampleRootWasRemoved()`, `sampleRegionChanged()` |
 | Respect explicit descendant CJK `lang` | `src/page/element-language.ts` | `ElementLanguage.explicitVariantFor()`, `browserHandlesLanguageFor()` |
 | Calculate local SC, TC, and JP evidence | `src/language/local-evidence.ts` | `analyzeCjkEvidence()` |
 | Gate mixed Chinese/Japanese pages | `src/language/local-evidence.ts` | `hasStrongChineseJapaneseMix()` |
@@ -58,7 +58,7 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 | Default settings and storage migration | `src/settings/defaults.ts` | `DEFAULTS`, `settingsFromStorage()`, `preserveWebsiteFontsFromStorage()` |
 | Browser UI language to default Chinese variant | `src/settings/defaults.ts` | `defaultChineseForLanguage()` |
 | Installed font list and OS-dependent defaults | `src/settings/font-catalog.ts` | `getInstalledFonts()`, `defaultFor()`, `validChoice()` |
-| Validate and normalize site overrides | `src/settings/site-overrides.ts` | `getSiteOverride()`, `sanitizeSiteOverrides()`, `normalizeHostname()` |
+| Validate and normalize site overrides | `src/settings/site-overrides.ts` | `getSiteOverride()`, `sanitizeSiteOverrides()`, `siteRulesFromStorage()`, `normalizeHostname()` |
 | Settings form, autosave, previews, and mixed-mode consent | `src/options/main.ts` | form initialization and event listeners |
 | Site-language manager | `src/options/site-language-settings.ts` | `setupSiteLanguageSettings()` |
 | Popup status and site selection | `src/popup/main.ts` | popup initialization and event listeners |
