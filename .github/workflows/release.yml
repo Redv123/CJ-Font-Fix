@@ -46,7 +46,7 @@ jobs:
             exit 1
           }
           tag="v$version"
-          notes="docs/releases/$tag.md"
+          notes="docs/releases/release-notes.md"
           test -f "$notes" || {
             echo "Missing release notes: $notes" >&2
             exit 1

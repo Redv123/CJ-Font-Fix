@@ -216,7 +216,7 @@ function startContentApplication(): void {
           type: "editSiteRule",
           scope: message.scope || "hostname",
           hostname: location.hostname,
-          value: message.value === "inherit" ? null : message.value
+          value: message.value
         });
         if (!reply.ok) throw new Error(reply.error);
         await loadSettings();

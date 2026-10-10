@@ -26,7 +26,7 @@ This maps the code as it exists, not proposed features. Read [design decisions](
 
 `manifest.json` is Manifest V3. Vite builds `src/entries/content.ts` into one self-contained IIFE, `dist/content.js`. It builds `src/entries/background.ts` into `dist/background.js`, an ES-module service worker. `src/options/main.ts` and `src/popup/main.ts` are extension-page entries. `scripts/build.mjs` also copies the manifest, icons, locales, and license into `dist`; README files, architecture docs, and screenshots stay in the source repository.
 
-`.github/workflows/release.yml` builds from a GitHub source revision, checks that the package and manifest versions agree, requires a hand-written `docs/releases/v<version>.md`, and packages only `dist` as the Release asset. See [publishing a release](releasing.md) for the maintainer procedure.
+`.github/workflows/release.yml` builds from a GitHub source revision, checks that the package and manifest versions agree, requires a hand-written `docs/releases/release-notes.md`, and packages only `dist` as the Release asset. See [publishing a release](releasing.md) for the maintainer procedure.
 
 The content script runs at `document_start` in matching HTTP(S) frames, including configured blank/origin-fallback frames. Each frame detects and styles its own document. The popup addresses the top-level frame; only that frame reports toolbar icon state. The background worker accepts `setActionState` messages from frame 0 and applies the open-book icon only when intervention is in use. On cross-document navigation, Chromium restores the manifest's closed default; the worker forgets its old per-tab state so the new page's report can repaint it. There is no navigation timer or separate page-status probe. Its in-memory icon state is not durable across worker restarts.
 
@@ -89,6 +89,8 @@ The mixed detector is off by default, advanced-mode-only, and ineligible when th
 Defaults and font choices live in `src/settings/`; the options page saves changes immediately. Site overrides are stored in separate exact-hostname and registered-domain maps, not by URL path, and are managed separately. The background worker resolves the registered domain using `publicSuffix` once per document and serializes rule edits across popup and Settings. `settings/site-overrides.ts` resolves exact hostname choices before domain choices. An exact hostname `Auto` choice explicitly bypasses domain rules. Removing the entry restores inheritance; domain `Auto` deletes its rule. The main **Restore defaults** action does not delete site overrides. An unavailable page has no per-site controls in the popup because its content script cannot receive messages.
 
 The popup distinguishes the page result from actual intervention: a page may be detected as SC, TC, or JP while CSS is **Not needed**, or while no configured regional font can be applied. The icon opens only when CSS is attached (or Simple mode applies a root language), not merely because a CJK language was detected.
+
+`options/site-language-settings.ts` owns the grouped manager, global search, ten-rule pages, the shared add/edit dialog, and the animated Manage/Hide control. Drafts stay local until submission. The worker moves a rule between the two storage maps in one write and rejects an existing destination; closing an editor never writes its draft. Restore defaults remains separate from deleting site rules.
 
 ## Maintenance rules
 

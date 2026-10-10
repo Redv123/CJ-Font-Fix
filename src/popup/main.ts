@@ -6,7 +6,7 @@ import { byId } from "../shared/dom";
 import { localizeDocument, message, variantLabel } from "../shared/i18n";
 import { isVariant } from "../language/tags";
 import { isSiteChoice } from "../settings/site-overrides";
-import type { ContentMessage, ContentStatus, SiteRuleResult, SiteScope } from "../shared/types";
+import type { ContentMessage, ContentStatus, SiteRuleResult } from "../shared/types";
 
 const REASON_MESSAGE_KEYS: Record<string, string> = {
   "Disabled for this site": "reasonDisabledSite",
@@ -23,22 +23,6 @@ const REASON_MESSAGE_KEYS: Record<string, string> = {
 };
 
 let tabId: number | null = null;
-let currentStatus: ContentStatus | null = null;
-
-function updateSiteControls(): void {
-  if (!currentStatus) return;
-  const scope = byId<HTMLSelectElement>("siteScope");
-  scope.querySelector<HTMLOptionElement>('[value="domain"]')!.disabled = !currentStatus.siteDomain;
-  if (!currentStatus.siteDomain) scope.value = "hostname";
-  const domainScope = scope.value === "domain";
-  const select = byId<HTMLSelectElement>("override");
-  select.querySelector<HTMLOptionElement>('[value="inherit"]')!.hidden = domainScope;
-  select.value = domainScope ? currentStatus.domainChoice || "auto" : currentStatus.hostnameChoice || "inherit";
-  byId("siteScopeHelp").textContent = domainScope
-    ? message("domainScopeHelp", currentStatus.siteDomain || "")
-    : message("hostnameScopeHelp", currentStatus.hostname);
-}
-
 function send(message: Extract<ContentMessage, { type: "getStatus" }>): Promise<ContentStatus>;
 function send(message: Extract<ContentMessage, { type: "setSiteOverride" }>): Promise<SiteRuleResult>;
 async function send(message: ContentMessage): Promise<ContentStatus | SiteRuleResult> {
@@ -56,7 +40,6 @@ async function load(): Promise<void> {
   tabId = tab?.id ?? null;
   try {
     const status = await send({ type: "getStatus" });
-    currentStatus = status;
     byId("unavailableState").hidden = true;
     byId("statusGrid").hidden = false;
     byId("siteControls").hidden = false;
@@ -87,9 +70,14 @@ async function load(): Promise<void> {
     }
 
     const changedElements = status.changedElements ?? 0;
+    const inUse = status.siteOverride !== "off" && (status.simpleMode
+      ? Boolean(status.simpleLang)
+      : changedElements > 0);
     byId("statusGrid").classList.toggle("simple-status", status.simpleMode);
-    byId("fontRow").hidden = status.simpleMode;
-    byId("managedRow").hidden = status.simpleMode;
+    byId("statusGrid").classList.toggle("inactive-status", !inUse);
+    byId("fontRow").hidden = status.simpleMode || !inUse;
+    byId("interventionRow").hidden = !inUse;
+    byId("managedRow").hidden = status.simpleMode || !inUse;
     byId("font").textContent = status.fallbackChoice || message("none");
     byId("interventionLabel").textContent = status.simpleMode ? message("appliedLang") : message("cssIntervention");
 
@@ -101,7 +89,7 @@ async function load(): Promise<void> {
     else if (status.pageVariant) intervention = message("notNeeded");
     byId("intervention").textContent = intervention;
     byId("changed").textContent = String(changedElements);
-    updateSiteControls();
+    byId<HTMLSelectElement>("override").value = status.hostnameChoice || status.siteOverride || "auto";
   } catch {
     byId("site").textContent = message("notEnabledOnPage");
     byId("statusGrid").hidden = true;
@@ -113,11 +101,11 @@ async function load(): Promise<void> {
 
 byId<HTMLSelectElement>("override").addEventListener("change", async (event) => {
   const statusMessage = byId("message");
-  statusMessage.textContent = message("applying");
+  statusMessage.textContent = "";
   try {
     const value = (event.currentTarget as HTMLSelectElement).value;
-    if (value !== "inherit" && !isSiteChoice(value)) return;
-    const reply = await send({ type: "setSiteOverride", value, scope: byId<HTMLSelectElement>("siteScope").value as SiteScope });
+    if (!isSiteChoice(value)) return;
+    const reply = await send({ type: "setSiteOverride", value, scope: "hostname" });
     if (!reply.ok) throw new Error("Could not save site choice");
     statusMessage.textContent = "";
     window.setTimeout(() => void load(), 150);
@@ -125,8 +113,6 @@ byId<HTMLSelectElement>("override").addEventListener("change", async (event) => 
     statusMessage.textContent = message("couldNotUpdatePage");
   }
 });
-
-byId<HTMLSelectElement>("siteScope").addEventListener("change", updateSiteControls);
 
 byId<HTMLButtonElement>("settings").addEventListener("click", () => {
   void chrome.runtime.openOptionsPage();

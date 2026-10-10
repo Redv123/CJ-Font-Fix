@@ -23,6 +23,8 @@ The tests answer different questions. A passing unit test proves a deterministic
 
 `tests/sites/options-layout.spec.ts` loads the actual Settings page and checks its borderless font rows across four viewport widths: language headings and Sans/Serif fields reflow without horizontal overflow, both font labels share a color, and the default Chinese explanation is not constrained to the menu width.
 
+`tests/sites/site-settings.spec.ts` checks the actual popup and Settings flows: add/edit dialogs, cancellation, duplicate and destination conflicts, both directions of hostname/domain moves, concurrent edits, preserved site rules on Restore defaults, deletion, and active/inactive popup details. Its 100-rule fixture checks global search and ten-rule pages within a language group. Manage/Hide animation and reduced-motion behavior have a separate check.
+
 ## Independently labeled language corpus
 
 The opt-in `tests/sites/flores-corpus.spec.ts` uses the official [FLORES-200](https://github.com/facebookresearch/flores/blob/main/flores200/README.md) `devtest` files for `zho_Hans`, `zho_Hant`, and `jpn_Jpan`. Its 120 cases are 40 non-overlapping groups per variant, alternating one, three, and ten distinct sentences per page. Half of the pages have no `lang`; half declare `en-US`. Playwright serves each group as a local page, loads the built extension, and lets Chromium actually run `chrome.i18n.detectLanguage()`. The expected region comes from the dataset label, not a stubbed detector or the extension's own output. No external website receives these page loads.

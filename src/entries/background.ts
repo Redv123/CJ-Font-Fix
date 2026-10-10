@@ -95,15 +95,20 @@ async function editSiteRule(edit: SiteRuleEdit): Promise<void> {
   const hostname = edit.scope === "domain" ? chrome.publicSuffix.getDomain(host) : host;
   if (!hostname) throw new Error("noRegistrableDomain");
   const key = edit.scope === "domain" ? "siteDomainOverrides" : "siteOverrides";
-  const stored = await chrome.storage.sync.get(key);
+  const previousScope = edit.previousScope ?? edit.scope;
+  if (previousScope !== "hostname" && previousScope !== "domain") throw new Error("Invalid site scope");
+  const previousKey = previousScope === "domain" ? "siteDomainOverrides" : "siteOverrides";
+  const stored = await chrome.storage.sync.get([key, previousKey]);
   const rules = sanitizeSiteOverrides(stored[key], true);
-  if (edit.previousHostname && edit.previousHostname !== hostname && Object.hasOwn(rules, hostname)) {
+  const sameRule = edit.previousHostname === hostname && key === previousKey;
+  if (edit.value !== null && (edit.createOnly || (edit.previousHostname && !sameRule)) && Object.hasOwn(rules, hostname)) {
     throw new Error("siteRuleConflict");
   }
-  if (edit.previousHostname) delete rules[edit.previousHostname];
+  const previousRules = previousKey === key ? rules : sanitizeSiteOverrides(stored[previousKey], true);
+  if (edit.previousHostname) delete previousRules[edit.previousHostname];
   if (edit.value === null || (edit.scope === "domain" && edit.value === "auto")) delete rules[hostname];
   else Object.defineProperty(rules, hostname, { value: edit.value, enumerable: true, configurable: true, writable: true });
-  await chrome.storage.sync.set({ [key]: rules });
+  await chrome.storage.sync.set({ [previousKey]: previousRules, [key]: rules });
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

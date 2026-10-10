@@ -48,7 +48,7 @@ export interface ContentStatus {
 
 export type ContentMessage =
   | { type: "getStatus" }
-  | { type: "setSiteOverride"; value: SiteChoice | "inherit"; scope?: SiteScope };
+  | { type: "setSiteOverride"; value: SiteChoice; scope?: SiteScope };
 
 export interface SiteRuleEdit {
   type: "editSiteRule";
@@ -56,11 +56,14 @@ export interface SiteRuleEdit {
   hostname: string;
   value: SiteChoice | null;
   previousHostname?: string;
+  previousScope?: SiteScope;
+  createOnly?: boolean;
 }
 
 export interface SiteRuleResult {
   ok: boolean;
   error?: string;
+  errorKey?: string;
 }
 
 export interface ActionStateMessage {
