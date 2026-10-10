@@ -84,6 +84,7 @@
   "sameAsSans": { "message": "Same as Sans" },
   "notConfigured": { "message": "Not configured" },
   "couldNotSave": { "message": "Could not save: $DETAILS$", "placeholders": { "details": { "content": "$1" } } },
+  "couldNotLoadSettings": { "message": "Could not load settings: $DETAILS$", "placeholders": { "details": { "content": "$1" } } },
   "fontListEmpty": { "message": "The browser returned an empty font list." },
   "couldNotLoadFonts": { "message": "Could not load installed fonts: $DETAILS$", "placeholders": { "details": { "content": "$1" } } },
   "reasonDisabledSite": { "message": "Disabled for this site" },

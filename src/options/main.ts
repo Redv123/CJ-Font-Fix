@@ -17,6 +17,8 @@ const checkKeys = [
 ] as const;
 
 let installedFonts: InstalledFont[] = [];
+let settingsLoaded = false;
+let fontListError = "";
 // Serialize automatic saves so a slower earlier write cannot win last.
 let saveQueue: Promise<void> = Promise.resolve();
 const modeAnimations = new Map<HTMLElement, Animation>();
@@ -27,14 +29,8 @@ function showStatus(message: string, isError = false): void {
   status.classList.toggle("error", isError);
 }
 
-function collectValues(): Omit<Settings, "siteOverrides" | "siteDomainOverrides"> {
-  return {
-    fontSC: byId<HTMLSelectElement>("fontSC").value,
-    fontTC: byId<HTMLSelectElement>("fontTC").value,
-    fontJP: byId<HTMLSelectElement>("fontJP").value,
-    fontSCSerif: byId<HTMLSelectElement>("fontSCSerif").value,
-    fontTCSerif: byId<HTMLSelectElement>("fontTCSerif").value,
-    fontJPSerif: byId<HTMLSelectElement>("fontJPSerif").value,
+function collectValues(): Partial<Omit<Settings, "siteOverrides" | "siteDomainOverrides">> {
+  const values: Partial<Omit<Settings, "siteOverrides" | "siteDomainOverrides">> = {
     defaultChinese: byId<HTMLSelectElement>("defaultChinese").value === "tc" ? "tc" : "sc",
     trustCjkLang: byId<HTMLInputElement>("trustCjkLang").checked,
     preserveWebsiteFonts: byId<HTMLInputElement>("preserveWebsiteFonts").checked,
@@ -42,9 +38,15 @@ function collectValues(): Omit<Settings, "siteOverrides" | "siteDomainOverrides"
     dynamicDetection: byId<HTMLInputElement>("dynamicDetection").checked,
     mixedLanguageDetection: byId<HTMLInputElement>("mixedLanguageDetection").checked
   };
+  // An unavailable font menu must not overwrite a saved family with an empty value.
+  if (installedFonts.length) {
+    for (const key of fontKeys) values[key] = byId<HTMLSelectElement>(key).value;
+  }
+  return values;
 }
 
 async function saveSettings(): Promise<void> {
+  if (!settingsLoaded) return;
   const values = collectValues();
   const operation = saveQueue.catch(() => undefined).then(async () => {
     await chrome.storage.sync.set(values);
@@ -53,7 +55,7 @@ async function saveSettings(): Promise<void> {
   saveQueue = operation;
   try {
     await operation;
-    showStatus("");
+    showStatus(fontListError, Boolean(fontListError));
   } catch (error) {
     showStatus(message("couldNotSave", errorMessage(error)), true);
   }
@@ -154,33 +156,55 @@ function applyDefaults(): void {
 }
 
 async function restore(): Promise<void> {
+  const generalControls = ["defaultChinese", ...checkKeys].map((key) =>
+    byId<HTMLInputElement | HTMLSelectElement>(key)
+  );
+  for (const control of generalControls) control.disabled = true;
+  const reset = byId<HTMLButtonElement>("resetSettings");
+  reset.disabled = true;
+  let stored: Record<string, unknown>;
+  try {
+    stored = await chrome.storage.sync.get(SETTINGS_STORAGE_KEYS);
+  } catch (error) {
+    showStatus(message("couldNotLoadSettings", errorMessage(error)), true);
+    return;
+  }
+  const values = settingsFromStorage(stored);
+  byId<HTMLSelectElement>("defaultChinese").value = values.defaultChinese;
+  for (const key of checkKeys) byId<HTMLInputElement>(key).checked = values[key];
+  settingsLoaded = true;
+  for (const control of generalControls) control.disabled = false;
+  updateModeControls();
+
   try {
     installedFonts = await getInstalledFonts();
     if (!installedFonts.length) throw new Error(message("fontListEmpty"));
-    fillFontMenus();
-
-    const stored = await chrome.storage.sync.get(SETTINGS_STORAGE_KEYS);
-    const values = settingsFromStorage(stored);
-    const repairedFonts: Partial<Record<FontSettingKey, string>> = {};
-    for (const key of fontKeys) {
-      const { variant, category } = FONT_SETTINGS[key];
-      const choice = Object.hasOwn(stored, key) && stored[key] === ""
-        ? ""
-        : validChoice(installedFonts, values[key], variant, category);
-      byId<HTMLSelectElement>(key).value = choice;
-      repairedFonts[key] = choice;
-    }
-    byId<HTMLSelectElement>("defaultChinese").value = values.defaultChinese;
-    for (const key of checkKeys) byId<HTMLInputElement>(key).checked = values[key];
-    updatePreviews();
-    updateModeControls();
-
-    if (fontKeys.some((key) => repairedFonts[key] !== values[key])) {
-      await chrome.storage.sync.set(repairedFonts);
-    }
   } catch (error) {
-    byId("settingsForm").classList.add("font-list-unavailable");
-    showStatus(message("couldNotLoadFonts", errorMessage(error)), true);
+    fontListError = message("couldNotLoadFonts", errorMessage(error));
+    showStatus(fontListError, true);
+    return;
+  }
+  fillFontMenus();
+  const repairedFonts: Partial<Record<FontSettingKey, string>> = {};
+  for (const key of fontKeys) {
+    const { variant, category } = FONT_SETTINGS[key];
+    const choice = Object.hasOwn(stored, key) && stored[key] === ""
+      ? ""
+      : validChoice(installedFonts, values[key], variant, category);
+    byId<HTMLSelectElement>(key).value = choice;
+    repairedFonts[key] = choice;
+  }
+  updatePreviews();
+  updateModeControls();
+  reset.disabled = false;
+  if (fontKeys.some((key) => repairedFonts[key] !== values[key])) {
+    const operation = saveQueue.catch(() => undefined).then(() => chrome.storage.sync.set(repairedFonts));
+    saveQueue = operation;
+    try {
+      await operation;
+    } catch (error) {
+      showStatus(message("couldNotSave", errorMessage(error)), true);
+    }
   }
 }
 

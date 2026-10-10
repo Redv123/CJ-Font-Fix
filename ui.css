@@ -78,7 +78,6 @@ button.warning-confirm { background: #b42318; color: #fff; }
 button.warning-confirm:hover { background: #921e15; box-shadow: 0 3px 10px rgba(180, 35, 24, .24); }
 button.warning-confirm:focus-visible { outline-color: #b42318; }
 .error { color: #b42318 !important; }
-.font-list-unavailable select, .font-list-unavailable button { pointer-events: none; opacity: .55; }
 .status-grid { margin: 20px 0; border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
 .status-grid div { display: grid; grid-template-columns: 112px 1fr; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .status-grid div[hidden] { display: none; }

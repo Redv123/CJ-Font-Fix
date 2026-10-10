@@ -84,6 +84,7 @@
   "sameAsSans": { "message": "與黑體相同" },
   "notConfigured": { "message": "未設定" },
   "couldNotSave": { "message": "無法儲存：$DETAILS$", "placeholders": { "details": { "content": "$1" } } },
+  "couldNotLoadSettings": { "message": "無法載入設定：$DETAILS$", "placeholders": { "details": { "content": "$1" } } },
   "fontListEmpty": { "message": "瀏覽器傳回了空白的字型清單。" },
   "couldNotLoadFonts": { "message": "無法載入已安裝字型：$DETAILS$", "placeholders": { "details": { "content": "$1" } } },
   "reasonDisabledSite": { "message": "已對此網站停用" },

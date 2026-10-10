@@ -84,6 +84,7 @@
   "sameAsSans": { "message": "ゴシック体と同じ" },
   "notConfigured": { "message": "未設定" },
   "couldNotSave": { "message": "保存できませんでした：$DETAILS$", "placeholders": { "details": { "content": "$1" } } },
+  "couldNotLoadSettings": { "message": "設定を読み込めませんでした：$DETAILS$", "placeholders": { "details": { "content": "$1" } } },
   "fontListEmpty": { "message": "ブラウザーから空のフォント一覧が返されました。" },
   "couldNotLoadFonts": { "message": "インストール済みフォントを読み込めませんでした：$DETAILS$", "placeholders": { "details": { "content": "$1" } } },
   "reasonDisabledSite": { "message": "このサイトではオフ" },

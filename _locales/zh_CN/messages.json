@@ -84,6 +84,7 @@
   "sameAsSans": { "message": "与黑体相同" },
   "notConfigured": { "message": "未配置" },
   "couldNotSave": { "message": "无法保存：$DETAILS$", "placeholders": { "details": { "content": "$1" } } },
+  "couldNotLoadSettings": { "message": "无法加载设置：$DETAILS$", "placeholders": { "details": { "content": "$1" } } },
   "fontListEmpty": { "message": "浏览器返回了空的字体列表。" },
   "couldNotLoadFonts": { "message": "无法加载已安装字体：$DETAILS$", "placeholders": { "details": { "content": "$1" } } },
   "reasonDisabledSite": { "message": "已对此网站禁用" },
