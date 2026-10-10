@@ -113,6 +113,9 @@ export class PageObserver {
 
   private handleAttributeMutation(mutation: MutationRecord): boolean {
     const { managedStyles, fontSupport, updates } = this.dependencies;
+    // Main-region changes were handled before dispatch; other ARIA roles do
+    // not change language sampling or require font work.
+    if (mutation.attributeName === "role") return false;
     if (mutation.attributeName === "style" && managedStyles.isSelfMutation(mutation.target)) return false;
     const managedTarget = mutation.target instanceof HTMLElement ? mutation.target : null;
     if (mutation.attributeName === "style" && managedTarget) {
@@ -275,12 +278,15 @@ export class PageObserver {
    * Recognize replacement of the sampled page itself without treating one
    * appended comment as a new page. Two existing CJK text nodes becoming
    * non-CJK is a conservative signal for same-URL view replacement; removing
-   * the selected sample root is definitive.
+   * the selected sample root or selecting another primary region also
+   * invalidates the sample.
    */
   private sampleWasSubstantiallyRewritten(mutations: MutationRecord[]): boolean {
     const { languageDetector } = this.dependencies;
     let replacedCjkNodes = 0;
     for (const mutation of mutations) {
+      if (mutation.type === "attributes" && mutation.attributeName === "role" &&
+          languageDetector.sampleRegionChanged(mutation)) return true;
       if (mutation.type === "childList" && languageDetector.sampleRootWasRemoved(mutation)) {
         return true;
       }
@@ -323,7 +329,7 @@ export class PageObserver {
       characterData: true,
       characterDataOldValue: true,
       attributes: true,
-      attributeFilter: ["lang", "class", "style", "placeholder", "value", "rel", "href", "media", "disabled"]
+      attributeFilter: ["lang", "class", "style", "placeholder", "value", "rel", "href", "media", "disabled", "role"]
     };
   }
 

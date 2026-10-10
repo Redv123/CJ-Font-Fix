@@ -73,6 +73,66 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("primary sample region changes", () => {
+  function environment() {
+    class Region {
+      readonly nodeType = 1;
+      constructor(readonly tagName: string, public role: string | null = null) {}
+      getAttribute(): string | null { return this.role; }
+      contains(node: unknown): boolean { return node === this; }
+      getRootNode(): object { return {}; }
+    }
+    const home = new Region("DIV", "main");
+    const channel = new Region("DIV");
+    let selected = home;
+    vi.stubGlobal("Element", Region);
+    vi.stubGlobal("Node", { TEXT_NODE: 3 });
+    vi.stubGlobal("NodeFilter", { SHOW_TEXT: 4 });
+    vi.stubGlobal("document", {
+      title: "Home", body: {}, documentElement: { lang: "en" },
+      querySelector: (selector: string) => selector === "main" ? null : selected,
+      createTreeWalker: () => ({ nextNode: () => null })
+    });
+    const detector = new PageLanguageDetector();
+    detector.collectSample();
+    const roleChange = (target: Region) => ({ type: "attributes", attributeName: "role", target }) as unknown as MutationRecord;
+    return { detector, home, channel, roleChange, select: () => { selected = channel; } };
+  }
+
+  it("invalidates the old sample when another connected region becomes primary", () => {
+    const { detector, home, channel, roleChange, select } = environment();
+    home.role = null;
+    channel.role = "main";
+    select();
+    expect(detector.sampleRegionChanged(roleChange(channel))).toBe(true);
+    detector.collectSample();
+    expect(detector.touchesSample(channel as unknown as Node)).toBe(true);
+    expect(detector.touchesSample(home as unknown as Node)).toBe(false);
+  });
+
+  it("keeps the sample when a role change does not change the selected region", () => {
+    const { detector, home, channel, roleChange } = environment();
+    channel.role = "button";
+    expect(detector.sampleRegionChanged(roleChange(channel))).toBe(false);
+    channel.role = "main";
+    expect(detector.sampleRegionChanged(roleChange(channel))).toBe(false);
+    expect(detector.touchesSample(home as unknown as Node)).toBe(true);
+  });
+
+  it("does not invalidate a manual or trusted declared language choice", async () => {
+    const { detector, channel, roleChange, select } = environment();
+    vi.stubGlobal("location", { hostname: "example.com" });
+    await detector.detect(settings({ siteOverrides: { "example.com": "jp" } }), () => "sc", null);
+    channel.role = "main";
+    select();
+    expect(detector.sampleRegionChanged(roleChange(channel))).toBe(false);
+    detector.collectSample();
+    vi.stubGlobal("document", { documentElement: { lang: "ja" } });
+    await detector.detect(settings(), () => "sc", null);
+    expect(detector.sampleRegionChanged(roleChange(channel))).toBe(false);
+  });
+});
+
 describe("page language decision order", () => {
   it.each(["日本語の検索結果", "繁體中文搜尋結果"])(
     "samples a later article regardless of its text: %s", (secondText) => {

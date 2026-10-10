@@ -132,11 +132,24 @@ export class PageLanguageDetector {
     return removed;
   }
 
+  /** A cached SPA view can stop being primary without leaving the DOM. */
+  sampleRegionChanged(mutation: MutationRecord): boolean {
+    if (!this.sampleRoot || mutation.type !== "attributes" || mutation.attributeName !== "role" ||
+        !(mutation.target instanceof Element)) return false;
+    if (mutation.target !== this.sampleRoot && mutation.target.getAttribute("role") !== "main") return false;
+    if (this.chooseSampleRoot() === this.sampleRoot) return false;
+    this.sampleRoot = null;
+    return true;
+  }
+
   async detect(
     settings: Settings,
     classifyChinese: (text: string) => "sc" | "tc",
     originalSimpleLang: string | null
   ): Promise<ExtendedDetection> {
+    // Declared and manual choices have no automatic sample to invalidate.
+    // Automatic detection installs the current region again in collectSample.
+    this.sampleRoot = null;
     const htmlLang = settings.simpleMode && originalSimpleLang !== null
       ? originalSimpleLang
       : document.documentElement?.lang || "";

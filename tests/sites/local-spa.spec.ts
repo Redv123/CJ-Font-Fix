@@ -447,6 +447,57 @@ test("redetects Japanese content after an in-document history return", async () 
   }
 });
 
+test("redetects a cached channel when its main role is restored after the Back scan", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({ fontJP: "CJ Test Japanese", preserveWebsiteFonts: false,
+      dynamicDetection: true, simpleMode: false, trustCjkLang: true });
+  });
+  const page = await context.newPage();
+  try {
+    // Model the freshly reloaded Home document. Its cached channel stays in
+    // the DOM; returning to it changes role/hidden rather than replacing text.
+    await page.route("https://fixture.test/**", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<html lang="en"><head><title>YouTube</title></head><body>
+        <div id="home" role="main">English home page</div>
+        <div id="channel" hidden><p id="cached-japanese">${JAPANESE.repeat(3)}</p></div>
+        <button id="show-channel" type="button">Show channel</button>
+        <script>
+          document.querySelector('#show-channel').onclick = () => {
+            document.querySelector('#home').hidden = true;
+            document.querySelector('#home').removeAttribute('role');
+            document.querySelector('#channel').hidden = false;
+            document.querySelector('#channel').setAttribute('role', 'main');
+            document.title = 'konoyaAF - YouTube';
+          };
+          addEventListener('popstate', () => document.querySelector('#home').classList.toggle('loading'));
+        </script>
+      </body></html>`
+    }));
+    await page.goto("https://fixture.test/home");
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).reason).toBe("No CJK text");
+    await page.evaluate(() => {
+      history.replaceState({ view: "channel" }, "", "/videos");
+      history.pushState({ view: "home" }, "", "/home");
+      history.back();
+    });
+    await page.waitForURL("https://fixture.test/videos");
+    // Ensure the URL-change scan has run against Home before restoring the
+    // channel, rather than relying on a race with the detector's scheduler.
+    await page.waitForTimeout(400);
+    await expect.poll(async () => (await currentStatus()).reason).toBe("No CJK text");
+    await page.locator("#show-channel").click();
+    await expect(page.locator("#channel")).toBeVisible();
+    await expect.poll(async () => (await currentStatus()).pageVariant).toBe("jp");
+    await expect.poll(() => page.locator("#cached-japanese").evaluate((element) => getComputedStyle(element).fontFamily))
+      .toContain("CJ Test Japanese");
+  } finally {
+    await page.close();
+  }
+});
+
 test("uses the current website stack when repeated text elements change style", async () => {
   await worker.evaluate(async () => {
     await chrome.storage.sync.clear();
