@@ -6,6 +6,50 @@ afterEach(() => {
   vi.resetModules();
 });
 
+describe("site-rule update cleanup", () => {
+  it("removes old Auto defaults without overwriting a concurrent popup edit", async () => {
+    let onInstalled: (() => Promise<void>) | undefined;
+    let onMessage: ((message: unknown, sender: chrome.runtime.MessageSender, reply: (result: unknown) => void) => boolean) | undefined;
+    const stored: Record<string, unknown> = { siteOverrides: { "old.example.com": "auto" }, siteDomainOverrides: {} };
+    let resumeRead!: () => void;
+    let readStarted!: () => void;
+    const blocked = new Promise<void>((resolve) => { resumeRead = resolve; });
+    const started = new Promise<void>((resolve) => { readStarted = resolve; });
+    let firstRead = true;
+    vi.stubGlobal("chrome", {
+      runtime: {
+        onInstalled: { addListener: (listener: typeof onInstalled) => { onInstalled = listener; } },
+        onMessage: { addListener: (listener: typeof onMessage) => { onMessage = listener; } }
+      },
+      tabs: { onUpdated: { addListener: () => undefined }, onRemoved: { addListener: () => undefined } },
+      publicSuffix: { getDomain: () => "example.com" },
+      fontSettings: { getFontList: async () => [] },
+      storage: { sync: {
+        get: async (keys: string[]) => {
+          const snapshot = structuredClone(Object.fromEntries(keys.filter((key) => Object.hasOwn(stored, key)).map((key) => [key, stored[key]])));
+          if (firstRead) {
+            firstRead = false;
+            readStarted();
+            await blocked;
+          }
+          return snapshot;
+        },
+        set: async (values: Record<string, unknown>) => { Object.assign(stored, structuredClone(values)); }
+      } }
+    });
+    await import("../src/entries/background");
+    if (!onInstalled || !onMessage) throw new Error("The background listeners were not registered");
+    const cleanup = onInstalled();
+    await started;
+    const edit = new Promise((resolve) => onMessage!({ type: "editSiteRule", scope: "hostname",
+      hostname: "chosen.example.com", value: "sc" }, {}, resolve));
+    resumeRead();
+    await cleanup;
+    expect(await edit).toEqual({ ok: true, deletedRules: undefined });
+    expect(stored).toEqual({ siteOverrides: { "chosen.example.com": "sc" }, siteDomainOverrides: {} });
+  });
+});
+
 describe("toolbar icon across navigations", () => {
   it("follows the new page's intervention report without a navigation timer", async () => {
     vi.useFakeTimers();

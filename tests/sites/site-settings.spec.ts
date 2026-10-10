@@ -72,6 +72,57 @@ test("applies Settings domain choices and popup hostname exceptions", async () =
   await expect(popup.locator("#detected")).toHaveText("Simplified Chinese");
 });
 
+test("removes the default site record when a popup choice returns to Auto", async () => {
+  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
+  await worker.evaluate(() => chrome.storage.sync.set({ siteOverrides: { "tieba.example.com": "jp" },
+    siteDomainOverrides: {}, simpleMode: false, trustCjkLang: true }));
+  const options = await context.newPage();
+  await options.goto(await worker.evaluate(() => chrome.runtime.getURL("options.html")));
+  await options.locator("#toggleSiteOverrides").click();
+  await expect(options.getByRole("button", { name: "Edit website: tieba.example.com", exact: true })).toBeVisible();
+  const site = await context.newPage();
+  await site.route("https://tieba.example.com/**", (route) => route.fulfill({ contentType: "text/html; charset=utf-8",
+    body: '<html lang="zh-CN"><body><p>这是中文内容。</p></body></html>' }));
+  await site.goto("https://tieba.example.com/");
+  const popup = await context.newPage();
+  await popup.goto(await worker.evaluate(() => chrome.runtime.getURL("popup.html")));
+  await site.bringToFront();
+  await popup.reload();
+  await expect(popup.locator("#detected")).toHaveText("Japanese");
+  await popup.locator("#override").selectOption("auto");
+  await expect(popup.locator("#detected")).toHaveText("Simplified Chinese");
+  await expect(options.locator(".site-rule-group")).toHaveCount(0);
+  await expect(options.getByRole("button", { name: "Edit website: tieba.example.com", exact: true })).toHaveCount(0);
+  await expect(options.getByText("Automatic detection", { exact: true })).toHaveCount(0);
+  expect(await worker.evaluate(() => chrome.storage.sync.get("siteOverrides"))).toEqual({ siteOverrides: {} });
+});
+
+test("omits old automatic defaults and cleans them before adding a domain rule", async () => {
+  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
+  await worker.evaluate(() => chrome.storage.sync.set({
+    siteOverrides: { "old.example.com": "auto", localhost: "auto", "127.0.0.1": "auto", "[::1]": "auto", "chosen.example.com": "tc" }, siteDomainOverrides: {}
+  }));
+  const options = await context.newPage();
+  await options.goto(await worker.evaluate(() => chrome.runtime.getURL("options.html")));
+  await options.locator("#toggleSiteOverrides").click();
+  await expect(options.locator(".site-rule-group summary .count")).toHaveText(["1 rule"]);
+  await expect(options.getByRole("button", { name: "Edit website: old.example.com", exact: true })).toHaveCount(0);
+  await expect(options.getByText("Automatic detection", { exact: true })).toHaveCount(0);
+  await addRule(options, "example.com", "domain", "jp");
+  expect(await worker.evaluate(() => chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides"]))).toEqual({
+    siteOverrides: { "chosen.example.com": "tc" }, siteDomainOverrides: { "example.com": "jp" }
+  });
+  await expect(options.locator(".site-rule-group summary .count")).toHaveText(["1 rule", "1 rule"]);
+  // An automatic exception becomes redundant when its domain rule is removed.
+  await worker.evaluate(() => chrome.storage.sync.set({
+    siteOverrides: { "old.example.com": "auto", "chosen.example.com": "tc" }
+  }));
+  await expect(options.locator(".site-rule-group summary .count")).toHaveText(["1 rule", "1 rule", "1 rule"]);
+  await removeRule(options, "example.com");
+  await expect(options.locator(".site-rule-group summary .count")).toHaveText(["1 rule"]);
+  expect(await worker.evaluate(() => chrome.storage.sync.get("siteOverrides"))).toEqual({ siteOverrides: { "chosen.example.com": "tc" } });
+});
+
 test("keeps legacy choices and separates hosted domains in the Settings editor", async () => {
   const worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
   await worker.evaluate(() => chrome.storage.sync.set({ siteOverrides: { "legacy.example.com": "tc" }, siteDomainOverrides: {} }));

@@ -1,4 +1,4 @@
-import type { Settings, SiteChoice, SiteOverride } from "../shared/types";
+import type { Settings, SiteChoice, SiteOverride, SiteRuleSnapshot } from "../shared/types";
 
 let pageDomain: string | null = null;
 
@@ -43,6 +43,22 @@ export function sanitizeSiteOverrides(value: unknown, allowAutomatic = false): R
     }
   }
   return result;
+}
+
+/** Auto needs a record only when it bypasses a saved domain choice. */
+export function siteRulesFromStorage(
+  stored: Record<string, unknown>,
+  domainForHostname: (hostname: string) => string | null | undefined
+): SiteRuleSnapshot {
+  const siteOverrides = sanitizeSiteOverrides(stored.siteOverrides, true);
+  const siteDomainOverrides = sanitizeSiteOverrides(stored.siteDomainOverrides);
+  for (const [hostname, choice] of Object.entries(siteOverrides)) {
+    if (choice !== "auto") continue;
+    const normalized = normalizeHostname(hostname);
+    const domain = normalized ? domainForHostname(normalized) : null;
+    if (!domain || !Object.hasOwn(siteDomainOverrides, domain)) delete siteOverrides[hostname];
+  }
+  return { siteOverrides, siteDomainOverrides };
 }
 
 /** Accept a URL or bare host, but store only its normalized hostname. */

@@ -6,7 +6,7 @@
 import { getInstalledFonts, validChoice } from "../settings/font-catalog";
 import { FONT_SETTINGS, LEGACY_PRESERVE_KEYS, preserveWebsiteFontsFromStorage } from "../settings/defaults";
 import type { FontSettingKey } from "../settings/defaults";
-import { isSiteChoice, normalizeHostname, sanitizeSiteOverrides } from "../settings/site-overrides";
+import { isSiteChoice, normalizeHostname, sanitizeSiteOverrides, siteRulesFromStorage } from "../settings/site-overrides";
 import type { SiteRuleEdit } from "../shared/types";
 import type { ActionStateMessage } from "../shared/types";
 
@@ -60,7 +60,15 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 chrome.runtime.onInstalled.addListener(async () => {
   try {
-    const previous = await chrome.storage.sync.get(["preserveWebsiteFonts", ...LEGACY_PRESERVE_KEYS]);
+    const previous = await enqueueSiteRuleOperation(async () => {
+      const stored = await chrome.storage.sync.get(["preserveWebsiteFonts", ...LEGACY_PRESERVE_KEYS, "siteOverrides", "siteDomainOverrides"]);
+      const rules = siteRulesFromStorage(stored, (hostname) => chrome.publicSuffix.getDomain(hostname));
+      if (JSON.stringify(stored.siteOverrides || {}) !== JSON.stringify(rules.siteOverrides) ||
+          JSON.stringify(stored.siteDomainOverrides || {}) !== JSON.stringify(rules.siteDomainOverrides)) {
+        await chrome.storage.sync.set(rules);
+      }
+      return stored;
+    });
     if (LEGACY_PRESERVE_KEYS.some((key) => Object.hasOwn(previous, key))) {
       if (typeof previous.preserveWebsiteFonts !== "boolean") {
         await chrome.storage.sync.set({ preserveWebsiteFonts: preserveWebsiteFontsFromStorage(previous) });
@@ -87,6 +95,13 @@ chrome.runtime.onInstalled.addListener(async () => {
 // Serialize edits across Settings and popup instances; storage owns durable state.
 let siteRuleSaveQueue: Promise<unknown> = Promise.resolve();
 
+function enqueueSiteRuleOperation<T>(operation: () => Promise<T>): Promise<T> {
+  // A failed edit must not block later edits or update-time cleanup.
+  const queued = siteRuleSaveQueue.catch(() => undefined).then(operation);
+  siteRuleSaveQueue = queued;
+  return queued;
+}
+
 async function editSiteRule(edit: SiteRuleEdit): Promise<void> {
   if (edit.scope !== "hostname" && edit.scope !== "domain") throw new Error("Invalid site scope");
   if (edit.value !== null && !isSiteChoice(edit.value)) throw new Error("Invalid site choice");
@@ -98,17 +113,20 @@ async function editSiteRule(edit: SiteRuleEdit): Promise<void> {
   const previousScope = edit.previousScope ?? edit.scope;
   if (previousScope !== "hostname" && previousScope !== "domain") throw new Error("Invalid site scope");
   const previousKey = previousScope === "domain" ? "siteDomainOverrides" : "siteOverrides";
-  const stored = await chrome.storage.sync.get([key, previousKey]);
-  const rules = sanitizeSiteOverrides(stored[key], true);
+  const stored = await chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides"]);
+  // Remove old defaults before adding a domain rule, so they cannot silently
+  // become automatic-detection exceptions to that new rule.
+  const snapshot = siteRulesFromStorage(stored, (hostname) => chrome.publicSuffix.getDomain(hostname));
+  const rules = snapshot[key];
   const sameRule = edit.previousHostname === hostname && key === previousKey;
   if (edit.value !== null && (edit.createOnly || (edit.previousHostname && !sameRule)) && Object.hasOwn(rules, hostname)) {
     throw new Error("siteRuleConflict");
   }
-  const previousRules = previousKey === key ? rules : sanitizeSiteOverrides(stored[previousKey], true);
+  const previousRules = snapshot[previousKey];
   if (edit.previousHostname) delete previousRules[edit.previousHostname];
   if (edit.value === null || (edit.scope === "domain" && edit.value === "auto")) delete rules[hostname];
   else Object.defineProperty(rules, hostname, { value: edit.value, enumerable: true, configurable: true, writable: true });
-  await chrome.storage.sync.set({ [previousKey]: previousRules, [key]: rules });
+  await chrome.storage.sync.set(siteRulesFromStorage(snapshot, (hostname) => chrome.publicSuffix.getDomain(hostname)));
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -126,35 +144,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
   if (!["editSiteRule", "clearSiteRules", "restoreSiteRules"].includes(message?.type)) return false;
-  const previous = siteRuleSaveQueue;
-  const operation = (async () => {
-    try { await previous; } catch { /* A failed edit must not block later edits. */ }
+  const operation = enqueueSiteRuleOperation(async () => {
     if (message.type === "clearSiteRules") {
       const stored = await chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides"]);
-      const deletedRules = {
-        siteOverrides: sanitizeSiteOverrides(stored.siteOverrides, true),
-        siteDomainOverrides: sanitizeSiteOverrides(stored.siteDomainOverrides)
-      };
+      const deletedRules = siteRulesFromStorage(stored, (hostname) => chrome.publicSuffix.getDomain(hostname));
       await chrome.storage.sync.set({ siteOverrides: {}, siteDomainOverrides: {} });
       return deletedRules;
     } else if (message.type === "restoreSiteRules") {
       const stored = await chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides"]);
+      const current = siteRulesFromStorage(stored, (hostname) => chrome.publicSuffix.getDomain(hostname));
       // Keep choices made after the deletion, including edits from another window.
-      await chrome.storage.sync.set({
+      await chrome.storage.sync.set(siteRulesFromStorage({
         siteOverrides: {
           ...sanitizeSiteOverrides(message.rules?.siteOverrides, true),
-          ...sanitizeSiteOverrides(stored.siteOverrides, true)
+          ...current.siteOverrides
         },
         siteDomainOverrides: {
           ...sanitizeSiteOverrides(message.rules?.siteDomainOverrides),
-          ...sanitizeSiteOverrides(stored.siteDomainOverrides)
+          ...current.siteDomainOverrides
         }
-      });
+      }, (hostname) => chrome.publicSuffix.getDomain(hostname)));
     } else {
       await editSiteRule(message);
     }
-  })();
-  siteRuleSaveQueue = operation;
+  });
   void (async () => {
     try {
       const deletedRules = await operation;

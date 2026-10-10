@@ -1,6 +1,6 @@
 import { byId, errorMessage } from "../shared/dom";
 import { message, variantLabel } from "../shared/i18n";
-import { isSiteOverride, normalizeHostname, sanitizeSiteOverrides } from "../settings/site-overrides";
+import { isSiteOverride, normalizeHostname, siteRulesFromStorage } from "../settings/site-overrides";
 import type { SiteChoice, SiteRuleEdit, SiteRuleResult, SiteRuleSnapshot, SiteScope } from "../shared/types";
 
 interface SiteEntry {
@@ -184,9 +184,10 @@ export function setupSiteLanguageSettings(): void {
   async function restore(): Promise<void> {
     deferredSiteUpdate = false;
     const stored = await chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides"]);
+    const rules = siteRulesFromStorage(stored, (hostname) => chrome.publicSuffix.getDomain(hostname));
     entries = [
-      ...Object.entries(sanitizeSiteOverrides(stored.siteOverrides, true)).map(([hostname, choice]) => ({ hostname, choice, scope: "hostname" as const })),
-      ...Object.entries(sanitizeSiteOverrides(stored.siteDomainOverrides)).map(([hostname, choice]) => ({ hostname, choice, scope: "domain" as const }))
+      ...Object.entries(rules.siteOverrides).map(([hostname, choice]) => ({ hostname, choice, scope: "hostname" as const })),
+      ...Object.entries(rules.siteDomainOverrides).map(([hostname, choice]) => ({ hostname, choice, scope: "domain" as const }))
     ].sort((a, b) => a.hostname.localeCompare(b.hostname));
     if (!initialized) {
       if (entries.length <= 10) GROUPS.forEach((choice) => openGroups.add(choice));

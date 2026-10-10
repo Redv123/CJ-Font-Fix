@@ -3,7 +3,8 @@ import {
   getSiteOverride,
   isSiteOverride,
   normalizeHostname,
-  sanitizeSiteOverrides
+  sanitizeSiteOverrides,
+  siteRulesFromStorage
 } from "../src/settings/site-overrides";
 
 describe("site override values", () => {
@@ -77,5 +78,36 @@ describe("site rule matching", () => {
   });
   it("uses a domain choice for related subdomains", () => {
     expect(getSiteOverride({ siteOverrides: {}, siteDomainOverrides: { "example.co.uk": "jp" } }, "m.example.co.uk", "example.co.uk")).toBe("jp");
+  });
+});
+
+describe("default automatic site choices", () => {
+  const domainFor = (hostname: string) => hostname.endsWith(".example.com") ? "example.com" : null;
+
+  it("removes redundant Auto records while keeping explicit choices and the stored input", () => {
+    const stored = { siteOverrides: { "tieba.example.com": "auto", "chosen.example.com": "sc" }, siteDomainOverrides: {} };
+    expect(siteRulesFromStorage(stored, domainFor)).toEqual({ siteOverrides: { "chosen.example.com": "sc" }, siteDomainOverrides: {} });
+    expect(stored.siteOverrides["tieba.example.com"]).toBe("auto");
+  });
+
+  it("retains automatic detection only when it overrides an existing domain choice", () => {
+    expect(siteRulesFromStorage({
+      siteOverrides: { "tieba.example.com": "auto", "other.test": "auto", "chosen.example.com": "off" },
+      siteDomainOverrides: { "example.com": "jp" }
+    }, domainFor)).toEqual({
+      siteOverrides: { "tieba.example.com": "auto", "chosen.example.com": "off" },
+      siteDomainOverrides: { "example.com": "jp" }
+    });
+  });
+
+  it("does not keep an Auto record for a domain without a valid manual choice", () => {
+    expect(siteRulesFromStorage({ siteOverrides: { "tieba.example.com": "auto" },
+      siteDomainOverrides: { "example.com": "auto" } }, domainFor)).toEqual({ siteOverrides: {}, siteDomainOverrides: {} });
+  });
+
+  it("removes automatic defaults for local or invalid hosts without consulting an invalid domain", () => {
+    const lookup = () => null;
+    expect(siteRulesFromStorage({ siteOverrides: { localhost: "auto", "not a host": "auto" }, siteDomainOverrides: {} }, lookup))
+      .toEqual({ siteOverrides: {}, siteDomainOverrides: {} });
   });
 });
