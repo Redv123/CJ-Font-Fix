@@ -1,6 +1,7 @@
 import { getSiteOverride } from "../settings/site-overrides";
 import type { SimpleMode } from "../fallback/simple-mode";
 import type { ManagedStyles } from "../fallback/managed-styles";
+import type { MixedLanguage } from "../fallback/mixed-language";
 import type { FontSupport } from "../fonts/font-support";
 import { isVariant, langToVariant } from "../language/tags";
 import type { Settings } from "../shared/types";
@@ -22,6 +23,7 @@ interface PageObserverDependencies {
   languageDetector: PageLanguageDetector;
   fontSupport: FontSupport;
   managedStyles: ManagedStyles;
+  mixedLanguage: MixedLanguage;
   simpleMode: SimpleMode;
   openShadowRoots: Set<ShadowRoot>;
   requestRun: () => void;
@@ -175,18 +177,11 @@ export class PageObserver {
     if (!isInsideBody(target)) return false;
 
     updates.queueElement(target);
-    // A removed paragraph can invalidate the mixed-language choice of its
-    // immediate successor even though that successor's own text did not move.
+    // Only mixed mode needs to revisit text whose own DOM did not change.
     if (this.dependencies.settings().mixedLanguageDetection && mutation.removedNodes.length) {
-      const removedPeer = Array.from(mutation.removedNodes).find((node): node is HTMLElement =>
-        node instanceof HTMLElement && node.matches("p, li, blockquote")
-      );
-      let next = mutation.nextSibling;
-      for (let i = 0; i < 4 && next?.nodeType === Node.TEXT_NODE &&
-          !(next.nodeValue || "").trim(); i++) next = next.nextSibling;
-      if (removedPeer && next instanceof HTMLElement && next.tagName === removedPeer.tagName) {
-        updates.queueElement(next);
-      }
+      updates.queueElement(this.dependencies.mixedLanguage.dependentAfterRemoval(
+        mutation.removedNodes, mutation.nextSibling
+      ));
     }
     for (const node of mutation.addedNodes) {
       if (node.nodeType === Node.ELEMENT_NODE) updates.queueRoot(node);

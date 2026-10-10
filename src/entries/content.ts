@@ -1,6 +1,7 @@
 import { currentSiteDomain, getSiteOverride, initializeSiteDomain } from "../settings/site-overrides";
 import { FallbackController } from "../fallback/controller";
 import { ManagedStyles } from "../fallback/managed-styles";
+import { MixedLanguage } from "../fallback/mixed-language";
 import { SimpleMode } from "../fallback/simple-mode";
 import { FontSupport } from "../fonts/font-support";
 import { SC_CLUES, TC_CLUES } from "../language/chinese-clues";
@@ -52,12 +53,13 @@ function startContentApplication(): void {
     return analyzeCjkEvidence(text, SC_CLUES, TC_CLUES);
   }
 
+  const mixedLanguage = new MixedLanguage(managedStyles, localEvidence);
   const fallbackController = new FallbackController(
     managedStyles,
     fontSupport,
     () => settings,
     classifyChinese,
-    localEvidence
+    mixedLanguage
   );
 
   const pageObserver = new PageObserver({
@@ -67,6 +69,7 @@ function startContentApplication(): void {
     languageDetector,
     fontSupport,
     managedStyles,
+    mixedLanguage,
     simpleMode,
     openShadowRoots,
     requestRun: requestRunForQueuedWork

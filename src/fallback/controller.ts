@@ -4,7 +4,6 @@ import { collectCandidateElements, addCandidate, isInShadowTree } from "../page/
 import { ElementLanguage } from "../page/element-language";
 import type { FontSupport } from "../fonts/font-support";
 import { isVariant, langToVariant } from "../language/tags";
-import type { CjkEvidence } from "../language/local-evidence";
 import type { AppliedStyleState, ManagedStyles, ManagedSummary, StyleAction } from "./managed-styles";
 import { MixedLanguage } from "./mixed-language";
 import type { ExtendedDetection } from "../page/page-language";
@@ -34,17 +33,13 @@ export interface FallbackRun {
  * maintenance.
  */
 export class FallbackController {
-  private readonly mixedLanguage: MixedLanguage;
-
   constructor(
     private readonly managedStyles: ManagedStyles,
     private readonly fontSupport: FontSupport,
     private readonly getSettings: () => Settings,
     private readonly classifyChinese: (text: string) => "sc" | "tc",
-    analyzeLocalEvidence: (text: string) => CjkEvidence
-  ) {
-    this.mixedLanguage = new MixedLanguage(managedStyles, analyzeLocalEvidence);
-  }
+    private readonly mixedLanguage: MixedLanguage
+  ) {}
 
   get detectedLocalVariants(): ReadonlySet<Variant> {
     return this.mixedLanguage.detectedVariants;

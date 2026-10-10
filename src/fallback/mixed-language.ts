@@ -60,6 +60,19 @@ export class MixedLanguage {
     this.resetRunState();
   }
 
+  /** A removed peer can change the local choice of its unchanged successor. */
+  dependentAfterRemoval(removedNodes: NodeList, nextSibling: Node | null): HTMLElement | null {
+    const removedPeer = Array.from(removedNodes).find((node): node is HTMLElement =>
+      node instanceof HTMLElement && node.matches(ADJACENT_BLOCKS)
+    );
+    if (!removedPeer) return null;
+
+    let next = nextSibling;
+    for (let i = 0; i < 4 && next?.nodeType === Node.TEXT_NODE &&
+        !(next.nodeValue || "").trim(); i++) next = next.nextSibling;
+    return next instanceof HTMLElement && next.tagName === removedPeer.tagName ? next : null;
+  }
+
   prepare(
     candidates: Set<HTMLElement>,
     fullScan: boolean,
