@@ -107,7 +107,8 @@
   "addSite": { "message": "サイトを追加" },
   "remove": { "message": "削除" },
   "clearAllSiteOverrides": { "message": "すべてのサイト設定を削除" },
-  "clearSiteOverridesConfirm": { "message": "サイト別の言語設定をすべて削除しますか？" },
+  "siteSettingsDeleted": { "message": "サイトの設定を削除しました。" },
+  "undo": { "message": "元に戻す" },
   "invalidWebsite": { "message": "有効なホスト名または URL を入力してください。" },
   "couldNotSaveSiteOverrides": { "message": "サイト設定を保存できませんでした：$DETAILS$", "placeholders": { "details": { "content": "$1" } } },
   "couldNotLoadSiteOverrides": { "message": "サイト設定を読み込めませんでした：$DETAILS$", "placeholders": { "details": { "content": "$1" } } }

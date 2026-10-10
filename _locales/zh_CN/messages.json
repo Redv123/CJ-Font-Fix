@@ -107,7 +107,8 @@
   "addSite": { "message": "添加网站" },
   "remove": { "message": "删除" },
   "clearAllSiteOverrides": { "message": "删除所有网站设置" },
-  "clearSiteOverridesConfirm": { "message": "确定删除所有网站专用语言设置吗？" },
+  "siteSettingsDeleted": { "message": "网站设置已删除。" },
+  "undo": { "message": "撤销" },
   "invalidWebsite": { "message": "请输入有效的主机名或 URL。" },
   "couldNotSaveSiteOverrides": { "message": "无法保存网站设置：$DETAILS$", "placeholders": { "details": { "content": "$1" } } },
   "couldNotLoadSiteOverrides": { "message": "无法加载网站设置：$DETAILS$", "placeholders": { "details": { "content": "$1" } } }

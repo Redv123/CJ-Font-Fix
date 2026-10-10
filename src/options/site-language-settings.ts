@@ -1,7 +1,7 @@
 import { byId, errorMessage } from "../shared/dom";
 import { message, variantLabel } from "../shared/i18n";
 import { isSiteOverride, normalizeHostname, sanitizeSiteOverrides } from "../settings/site-overrides";
-import type { SiteChoice, SiteRuleEdit, SiteRuleResult, SiteScope } from "../shared/types";
+import type { SiteChoice, SiteRuleEdit, SiteRuleResult, SiteRuleSnapshot, SiteScope } from "../shared/types";
 
 interface SiteEntry {
   hostname: string;
@@ -40,6 +40,11 @@ export function setupSiteLanguageSettings(): void {
   const saveButton = byId<HTMLButtonElement>("saveSiteRule");
   const removeButton = byId<HTMLButtonElement>("removeSiteRule");
   const search = byId<HTMLInputElement>("siteRuleSearch");
+  const clearButton = byId<HTMLButtonElement>("clearSiteOverrides");
+  const undoButton = byId<HTMLButtonElement>("undoSiteOverrides");
+  const deleteNotice = byId("siteDeleteNotice");
+  let deletedRules: SiteRuleSnapshot | null = null;
+  let bulkBusy = false;
   let returnFocus: HTMLElement | null = null;
   let savedFocusKey = "";
 
@@ -85,7 +90,7 @@ export function setupSiteLanguageSettings(): void {
       : message(entries.length === 1 ? "siteRuleCountOne" : "siteRuleCount", String(entries.length));
     byId("noSiteOverrides").hidden = matches.length > 0;
     byId("noSiteOverrides").textContent = message(query ? "noMatchingWebsites" : "noSiteOverrides");
-    byId<HTMLButtonElement>("clearSiteOverrides").disabled = entries.length === 0;
+    clearButton.disabled = bulkBusy || entries.length === 0;
     const groups: HTMLDetailsElement[] = [];
     for (const choice of GROUPS) {
       const members = matches.filter((entry) => entry.choice === choice);
@@ -317,15 +322,52 @@ export function setupSiteLanguageSettings(): void {
     }).catch(() => undefined);
   });
 
-  byId("clearSiteOverrides").addEventListener("click", async () => {
-    if (!entries.length || !window.confirm(message("clearSiteOverridesConfirm"))) return;
+  clearButton.addEventListener("click", async () => {
+    if (!entries.length || bulkBusy) return;
+    bulkBusy = true;
+    clearButton.disabled = true;
+    undoButton.disabled = true;
+    showError("");
     try {
-      const reply = await chrome.runtime.sendMessage({ type: "clearSiteRules" });
+      const reply: SiteRuleResult = await chrome.runtime.sendMessage({ type: "clearSiteRules" });
       if (!reply.ok) throw new Error(reply.errorKey ? message(reply.errorKey) : reply.error);
+      deletedRules = reply.deletedRules || null;
+      byId("siteDeleteMessage").textContent = message("siteSettingsDeleted");
+      deleteNotice.hidden = !deletedRules;
+      search.value = "";
       await restore();
-      showError("");
+      undoButton.disabled = false;
+      if (deletedRules) undoButton.focus();
     } catch (error) {
       showError(message("couldNotSaveSiteOverrides", errorMessage(error)));
+    } finally {
+      bulkBusy = false;
+      undoButton.disabled = false;
+      clearButton.disabled = entries.length === 0;
+    }
+  });
+  undoButton.addEventListener("click", async () => {
+    if (!deletedRules || bulkBusy) return;
+    bulkBusy = true;
+    undoButton.disabled = true;
+    clearButton.disabled = true;
+    showError("");
+    try {
+      const reply: SiteRuleResult = await chrome.runtime.sendMessage({ type: "restoreSiteRules", rules: deletedRules });
+      if (!reply.ok) throw new Error(reply.errorKey ? message(reply.errorKey) : reply.error);
+      deletedRules = null;
+      deleteNotice.hidden = true;
+      byId("siteDeleteMessage").textContent = "";
+      search.value = "";
+      await restore();
+      clearButton.disabled = entries.length === 0;
+      (entries.length ? clearButton : byId("openAddSite")).focus();
+    } catch (error) {
+      showError(message("couldNotSaveSiteOverrides", errorMessage(error)));
+    } finally {
+      bulkBusy = false;
+      undoButton.disabled = false;
+      clearButton.disabled = entries.length === 0;
     }
   });
   chrome.storage.onChanged.addListener((changes, area) => {

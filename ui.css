@@ -120,6 +120,10 @@ dd { margin: 0; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
 .recent-site-rule { animation: site-highlight 1600ms ease-out; }
 @keyframes site-highlight { from { background: color-mix(in srgb, var(--accent) 15%, var(--panel)); } to { background: transparent; } }
 .site-overrides-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
+.site-delete-notice { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: color-mix(in srgb, var(--accent) 5%, var(--panel)); }
+.site-delete-notice[hidden] { display: none; }
+.site-delete-icon { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--panel); font-size: 13px; }
+.site-delete-notice button { flex: none; margin-left: auto; }
 button.text-action { min-height: 36px; padding: 6px 0; border: 0; background: transparent; color: var(--accent); font-weight: 500; }
 button.text-action:hover { background: transparent; box-shadow: none; text-decoration: underline; }
 button.icon-button { flex: none; display: grid; place-items: center; width: 30px; min-height: 30px; padding: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 23px; font-weight: 400; }

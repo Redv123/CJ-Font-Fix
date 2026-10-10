@@ -102,6 +102,11 @@
           </div>
           <p id="noSiteOverrides" class="empty-state" data-i18n="noSiteOverrides">No website-specific language settings.</p>
           <div id="siteOverrideList" class="site-override-list"></div>
+          <div id="siteDeleteNotice" class="site-delete-notice" hidden>
+            <span class="site-delete-icon" aria-hidden="true">✓</span>
+            <span id="siteDeleteMessage" role="status"></span>
+            <button id="undoSiteOverrides" class="secondary compact" type="button" data-i18n="undo">Undo</button>
+          </div>
           <div class="site-overrides-footer">
             <button id="clearSiteOverrides" class="secondary compact danger" type="button" data-i18n="clearAllSiteOverrides">Delete all site settings</button>
             <span id="siteOverrideStatus" role="status"></span>

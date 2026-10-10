@@ -93,9 +93,78 @@ test("keeps legacy choices and separates hosted domains in the Settings editor",
   await expect(page.locator("#siteRuleCount")).toHaveText("2 rules");
   await page.setViewportSize({ width: 400, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  page.once("dialog", (prompt) => prompt.accept());
   await page.locator("#clearSiteOverrides").click();
   await expect(page.locator("#siteRuleCount")).toHaveText("0 rules");
+});
+
+test("deletes both scopes without a browser dialog and undoes while keeping newer choices", async () => {
+  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
+  await worker.evaluate(() => chrome.storage.sync.set({
+    siteOverrides: { "one.example.com": "sc", "automatic.example.com": "auto" },
+    siteDomainOverrides: { "example.com": "jp" },
+    fontSC: "", defaultChinese: "tc"
+  }));
+  const page = await context.newPage();
+  const other = await context.newPage();
+  let browserDialogs = 0;
+  page.on("dialog", (prompt) => { browserDialogs++; void prompt.dismiss(); });
+  for (const options of [page, other]) {
+    await options.goto(await worker.evaluate(() => chrome.runtime.getURL("options.html")));
+    await options.locator("#toggleSiteOverrides").click();
+  }
+  await expect(page.locator("#siteDeleteNotice")).toBeHidden();
+  await page.locator("#clearSiteOverrides").click();
+  await expect(page.locator("#siteRuleCount")).toHaveText("0 rules");
+  expect(browserDialogs).toBe(0);
+  await expect(page.locator("#siteDeleteMessage")).toHaveText("Site settings deleted.");
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeFocused();
+  await expect(page.locator("#clearSiteOverrides")).toBeDisabled();
+  expect(await worker.evaluate(() => chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides", "fontSC", "defaultChinese"])))
+    .toEqual({ siteOverrides: {}, siteDomainOverrides: {}, fontSC: "", defaultChinese: "tc" });
+
+  await page.locator("#toggleSiteOverrides").click();
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeHidden();
+  await page.locator("#toggleSiteOverrides").click();
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+    let failUndo = true;
+    Object.defineProperty(chrome.runtime, "sendMessage", { value: async (request: { type: string }) => {
+      if (request.type === "restoreSiteRules" && failUndo) {
+        failUndo = false;
+        return { ok: false, error: "Simulated storage write failure" };
+      }
+      return send(request);
+    } });
+  });
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(page.locator("#siteOverrideStatus")).toContainText("Simulated storage write failure");
+  await expect(page.locator("#siteDeleteNotice")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  expect(await worker.evaluate(() => chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides"]))).toEqual({
+    siteOverrides: { "one.example.com": "sc", "automatic.example.com": "auto" },
+    siteDomainOverrides: { "example.com": "jp" }
+  });
+  await page.locator("#clearSiteOverrides").click();
+  await expect(page.locator("#siteRuleCount")).toHaveText("0 rules");
+  await addRule(other, "new.example.net", "hostname", "off");
+  await addRule(other, "one.example.com", "hostname", "tc");
+  await addRule(other, "example.com", "domain", "tc");
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(page.locator("#siteDeleteNotice")).toBeHidden();
+  await expect(page.locator("#clearSiteOverrides")).toBeFocused();
+  const restored = await worker.evaluate(() => chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides", "fontSC", "defaultChinese"]));
+  expect(restored).toEqual({
+    siteOverrides: { "one.example.com": "tc", "automatic.example.com": "auto", "new.example.net": "off" },
+    siteDomainOverrides: { "example.com": "tc" }, fontSC: "", defaultChinese: "tc"
+  });
+  await page.locator("#clearSiteOverrides").click();
+  await expect(page.locator("#siteRuleCount")).toHaveText("0 rules");
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  expect(await worker.evaluate(() => chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides", "fontSC", "defaultChinese"]))).toEqual(restored);
+  await page.close();
+  await other.close();
 });
 
 test("preserves unrelated edits from two Settings pages and rejects rename collisions", async () => {

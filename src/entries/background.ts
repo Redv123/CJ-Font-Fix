@@ -125,12 +125,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     return false;
   }
-  if (message?.type !== "editSiteRule" && message?.type !== "clearSiteRules") return false;
+  if (!["editSiteRule", "clearSiteRules", "restoreSiteRules"].includes(message?.type)) return false;
   const previous = siteRuleSaveQueue;
   const operation = (async () => {
     try { await previous; } catch { /* A failed edit must not block later edits. */ }
     if (message.type === "clearSiteRules") {
+      const stored = await chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides"]);
+      const deletedRules = {
+        siteOverrides: sanitizeSiteOverrides(stored.siteOverrides, true),
+        siteDomainOverrides: sanitizeSiteOverrides(stored.siteDomainOverrides)
+      };
       await chrome.storage.sync.set({ siteOverrides: {}, siteDomainOverrides: {} });
+      return deletedRules;
+    } else if (message.type === "restoreSiteRules") {
+      const stored = await chrome.storage.sync.get(["siteOverrides", "siteDomainOverrides"]);
+      // Keep choices made after the deletion, including edits from another window.
+      await chrome.storage.sync.set({
+        siteOverrides: {
+          ...sanitizeSiteOverrides(message.rules?.siteOverrides, true),
+          ...sanitizeSiteOverrides(stored.siteOverrides, true)
+        },
+        siteDomainOverrides: {
+          ...sanitizeSiteOverrides(message.rules?.siteDomainOverrides),
+          ...sanitizeSiteOverrides(stored.siteDomainOverrides)
+        }
+      });
     } else {
       await editSiteRule(message);
     }
@@ -138,8 +157,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   siteRuleSaveQueue = operation;
   void (async () => {
     try {
-      await operation;
-      sendResponse({ ok: true });
+      const deletedRules = await operation;
+      sendResponse({ ok: true, deletedRules });
     } catch (error) {
       const errorText = error instanceof Error ? error.message : String(error);
       sendResponse({

@@ -107,7 +107,8 @@
   "addSite": { "message": "Add website" },
   "remove": { "message": "Remove" },
   "clearAllSiteOverrides": { "message": "Delete all site settings" },
-  "clearSiteOverridesConfirm": { "message": "Delete all website-specific language settings?" },
+  "siteSettingsDeleted": { "message": "Site settings deleted." },
+  "undo": { "message": "Undo" },
   "invalidWebsite": { "message": "Enter a valid hostname or URL." },
   "couldNotSaveSiteOverrides": { "message": "Could not save site settings: $DETAILS$", "placeholders": { "details": { "content": "$1" } } },
   "couldNotLoadSiteOverrides": { "message": "Could not load site settings: $DETAILS$", "placeholders": { "details": { "content": "$1" } } }

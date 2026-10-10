@@ -107,7 +107,8 @@
   "addSite": { "message": "新增網站" },
   "remove": { "message": "刪除" },
   "clearAllSiteOverrides": { "message": "刪除所有網站設定" },
-  "clearSiteOverridesConfirm": { "message": "確定要刪除所有網站專用語言設定嗎？" },
+  "siteSettingsDeleted": { "message": "網站設定已刪除。" },
+  "undo": { "message": "復原" },
   "invalidWebsite": { "message": "請輸入有效的主機名稱或 URL。" },
   "couldNotSaveSiteOverrides": { "message": "無法儲存網站設定：$DETAILS$", "placeholders": { "details": { "content": "$1" } } },
   "couldNotLoadSiteOverrides": { "message": "無法載入網站設定：$DETAILS$", "placeholders": { "details": { "content": "$1" } } }

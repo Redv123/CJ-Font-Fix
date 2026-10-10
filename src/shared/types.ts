@@ -64,7 +64,10 @@ export interface SiteRuleResult {
   ok: boolean;
   error?: string;
   errorKey?: string;
+  deletedRules?: SiteRuleSnapshot;
 }
+
+export type SiteRuleSnapshot = Pick<Settings, "siteOverrides" | "siteDomainOverrides">;
 
 export interface ActionStateMessage {
   type: "setActionState";
