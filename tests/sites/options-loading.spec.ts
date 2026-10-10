@@ -66,10 +66,10 @@ for (const failure of ["error", "empty"] as const) {
       await page.locator("#newSiteHostname").fill("added.example.net");
       await page.locator("#newSiteVariant").selectOption("tc");
       await page.locator("#saveSiteRule").click();
-      await expect(page.locator("#siteRuleDialog")).toBeHidden();
+      await expect(page.locator("#addSiteOverride")).toBeHidden();
       await page.getByRole("button", { name: "Edit website: added.example.net", exact: true }).click();
-      await page.locator("#newSiteVariant").selectOption("off");
-      await page.locator("#saveSiteRule").click();
+      await page.locator(".site-inline-editor").getByRole("combobox", { name: "Language", exact: true }).selectOption("off");
+      await page.locator(".site-inline-editor").getByRole("button", { name: "Save changes", exact: true }).click();
       await expect.poll(() => worker.evaluate(() => chrome.storage.sync.get("siteOverrides")))
         .toEqual({ siteOverrides: { "example.com": "jp", "added.example.net": "off" } });
       await page.locator("#clearSiteOverrides").click();
@@ -129,8 +129,8 @@ test("reports saved-settings failures separately and keeps the site manager inde
     await expect(page.locator("#resetSettings")).toBeDisabled();
     await page.locator("#toggleSiteOverrides").click();
     await page.getByRole("button", { name: "Edit website: example.com", exact: true }).click();
-    await page.locator("#newSiteVariant").selectOption("tc");
-    await page.locator("#saveSiteRule").click();
+    await page.locator(".site-inline-editor").getByRole("combobox", { name: "Language", exact: true }).selectOption("tc");
+    await page.locator(".site-inline-editor").getByRole("button", { name: "Save changes", exact: true }).click();
     await expect.poll(() => worker.evaluate(() => chrome.storage.sync.get("siteOverrides")))
       .toEqual({ siteOverrides: { "example.com": "tc" } });
     expect(await worker.evaluate((keys) => chrome.storage.sync.get(keys), Object.keys(savedFonts))).toEqual(savedFonts);

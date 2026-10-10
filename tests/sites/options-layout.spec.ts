@@ -40,7 +40,9 @@ test("keeps action layout and readable secondary buttons across themes", async (
         return ["toggleSiteOverrides", "openAddSite", "clearSiteOverrides", "resetSettings"].map((id) => {
           const element = document.getElementById(id)!;
           const rect = element.getBoundingClientRect();
-          return { id, width: rect.width, height: rect.height, margin: getComputedStyle(element).marginTop,
+          // Animated translations can introduce tiny DOMRect rounding differences.
+          return { id, width: Math.round(rect.width * 100) / 100, height: Math.round(rect.height * 100) / 100,
+            margin: getComputedStyle(element).marginTop,
             insideHeader: id !== "toggleSiteOverrides" || rect.width < header.width / 2 };
         });
       });

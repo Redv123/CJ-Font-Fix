@@ -92,14 +92,25 @@
 
       <section class="site-overrides-section settings-section" aria-labelledby="siteOverridesTitle">
         <div class="section-heading">
-          <div class="heading-with-count"><h2 id="siteOverridesTitle" data-i18n="siteOverridesTitle">Site language settings</h2><span id="siteRuleCount" class="count" hidden></span></div>
+          <h2 id="siteOverridesTitle" data-i18n="siteOverridesTitle">Site language settings</h2>
           <button id="toggleSiteOverrides" class="secondary" type="button" aria-expanded="false" aria-controls="siteOverridesPanel" data-i18n="manageSiteOverrides">Manage site language settings</button>
         </div>
         <div id="siteOverridesPanel" class="site-overrides-panel" hidden>
-          <div class="site-toolbar">
-            <search><label class="visually-hidden" for="siteRuleSearch" data-i18n="searchWebsites">Search websites</label><input id="siteRuleSearch" type="search" name="search" spellcheck="false"></search>
-            <button id="openAddSite" type="button" data-i18n="addSite">Add website</button>
+          <div id="siteRuleToolbar" class="site-toolbar">
+            <search class="site-search"><label class="visually-hidden" for="siteRuleSearch" data-i18n="searchWebsites">Search websites</label><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 16.5 21 21M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0"/></svg><input id="siteRuleSearch" type="search" name="search" spellcheck="false"></search>
+            <button id="openAddSite" class="site-add-trigger" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="addSite">Add website</span></button>
           </div>
+          <form id="addSiteOverride" class="site-add-form" aria-label="Add website" hidden>
+            <label class="visually-hidden" for="newSiteHostname" data-i18n="website">Website</label><input id="newSiteHostname" name="hostname" type="text" inputmode="url" placeholder="example.com" spellcheck="false" autocapitalize="off" required aria-describedby="siteRuleError">
+            <label class="visually-hidden" for="newSiteScope" data-i18n="siteScope">Apply to</label><select id="newSiteScope" class="site-add-scope" name="scope" aria-describedby="siteRuleError"><option value="hostname" data-i18n="hostnameScope">Exact match</option><option value="domain" data-i18n="domainScope">Include subdomains</option></select>
+            <label class="visually-hidden" for="newSiteVariant" data-i18n="language">Language</label><select id="newSiteVariant" name="language" required aria-describedby="siteRuleError">
+              <option value="" disabled selected hidden data-i18n="chooseLanguage">Choose language</option>
+              <option value="sc" data-i18n="simplifiedChinese">Simplified Chinese</option><option value="tc" data-i18n="traditionalChinese">Traditional Chinese</option><option value="jp" data-i18n="japanese">Japanese</option><option value="off" data-i18n="disabled">Disabled</option>
+            </select>
+            <button id="saveSiteRule" class="site-row-action save" type="submit" aria-label="Add website" title="Add website"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></button>
+            <button id="cancelSiteRule" class="site-row-action cancel" type="button" aria-label="Cancel" title="Cancel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+            <p id="siteRuleError" class="site-add-error error" role="alert"></p>
+          </form>
           <div id="siteRulesResults" class="site-rules-results">
             <p id="noSiteOverrides" class="empty-state" data-i18n="noSiteOverrides">No website-specific language settings.</p>
             <div id="siteOverrideList" class="site-override-list"></div>
@@ -122,23 +133,6 @@
         <span id="status" role="status"></span>
       </div>
     </div>
-
-    <dialog id="siteRuleDialog" class="settings-dialog site-rule-dialog" aria-labelledby="siteRuleDialogTitle" closedby="any">
-      <form id="addSiteOverride">
-        <div class="dialog-heading"><h2 id="siteRuleDialogTitle" data-i18n="addSite">Add website</h2><button id="closeSiteRule" type="button" class="icon-button" aria-label="Close">×</button></div>
-        <label class="dialog-field" for="newSiteHostname"><span data-i18n="website">Website</span><input id="newSiteHostname" name="hostname" type="text" inputmode="url" placeholder="example.com" spellcheck="false" required autofocus></label>
-        <fieldset class="scope-selector"><legend data-i18n="siteScope">Apply to</legend><div class="scope-options">
-          <label><input id="siteScopeHostname" type="radio" name="siteScope" value="hostname" checked><span data-i18n="hostnameScope">Website only</span></label>
-          <label><input id="siteScopeDomain" type="radio" name="siteScope" value="domain"><span data-i18n="domainScope">Include subdomains</span></label>
-        </div></fieldset>
-        <label class="dialog-field" for="newSiteVariant"><span data-i18n="language">Language</span><select id="newSiteVariant" name="language" required>
-          <option value="" disabled selected hidden data-i18n="chooseLanguage">Choose language</option>
-          <option value="sc" data-i18n="simplifiedChinese">Simplified Chinese</option><option value="tc" data-i18n="traditionalChinese">Traditional Chinese</option><option value="jp" data-i18n="japanese">Japanese</option><option value="off" data-i18n="disabled">Disabled</option>
-        </select></label>
-        <p id="siteRuleError" class="error" role="alert"></p>
-        <div class="site-dialog-actions"><button id="removeSiteRule" type="button" class="secondary danger" hidden data-i18n="remove">Remove</button><div><button id="cancelSiteRule" type="button" class="secondary" data-i18n="cancel">Cancel</button><button id="saveSiteRule" type="submit" data-i18n="addSite">Add website</button></div></div>
-      </form>
-    </dialog>
 
     <dialog id="mixedLanguageConsent" class="settings-dialog" aria-labelledby="mixedLanguageConsentTitle" aria-describedby="mixedLanguageConsentBody">
       <h2 id="mixedLanguageConsentTitle" data-i18n="mixedLanguageConsentTitle">Enable experimental mixed-language detection?</h2>
