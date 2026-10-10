@@ -63,6 +63,7 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 | Site-language manager | `src/options/site-language-settings.ts` | `setupSiteLanguageSettings()` |
 | Popup status and site selection | `src/popup/main.ts` | popup initialization and event listeners |
 | Shared UI element lookup and error text | `src/shared/dom.ts` | `byId()`, `errorMessage()` |
+| Shared UI palette, button roles, interaction states, and page layout | `ui.css` | palette variables and the shared button rules |
 | Localized strings and variant labels | `src/shared/i18n.ts`, `_locales/` | `message()`, `variantLabel()`, `localizeDocument()` |
 | Shared settings and message shapes | `src/shared/types.ts` | `Settings`, `ContentStatus`, `ContentMessage` |
 

@@ -90,7 +90,9 @@ Defaults and font choices live in `src/settings/`; the options page saves change
 
 The popup distinguishes the page result from actual intervention: a page may be detected as SC, TC, or JP while CSS is **Not needed**, or while no configured regional font can be applied. The icon opens only when CSS is attached (or Simple mode applies a root language), not merely because a CJK language was detected.
 
-`options/site-language-settings.ts` owns the grouped manager, global search, ten-rule pages, the shared add/edit dialog, and the animated Manage/Hide control. Drafts stay local until submission. The worker moves a rule between the two storage maps in one write and rejects an existing destination; closing an editor never writes its draft. Restore defaults remains separate from deleting site rules.
+`options/site-language-settings.ts` owns the grouped manager, global search, ten-rule pages, the shared add/edit dialog, and the animated Manage/Hide control. Delete and Undo transition only the results region after storage succeeds; changes from other windows are refreshed when that transition finishes. Drafts stay local until submission. The worker moves a rule between the two storage maps in one write and rejects an existing destination; closing an editor never writes its draft. Restore defaults remains separate from deleting site rules.
+
+`ui.css` owns the shared palette and control appearance. Button roles choose internal color values; hover, focus, active, and disabled behavior is defined once. Page selectors own widths and placement, including the popup's full-width Settings action. Foreground and background colors switch together with the theme, while border, shadow, and press effects retain their transitions. Reduced-motion preferences cover search fields and other interactive controls.
 
 ## Maintenance rules
 
