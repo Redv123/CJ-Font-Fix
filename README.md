@@ -6,57 +6,69 @@
 
 On Linux, a page that neither identifies its language with `lang` nor calls an appropriate font in CSS may render CJK text requested in bold using a Regular face. The extension helps Chrome use the correct bold face and can select a Chinese font even when a Chinese page is marked `lang="en-US"`. This problem is more common on Chinese sites; Japanese sites are more likely to declare `lang="ja"`.
 
-On macOS and Windows, CJK bold text generally works already. The extension is still useful when a Chinese or Japanese page has no language declaration or is mislabeled `en-US`. In those cases, it helps the browser choose the right regional font. It is intended for readers who move between Chinese and Japanese sites, including Japanese learners who also read Chinese pages.
+For users on systems other than Linux, CJ Font Fallback Fix selects character fonts according to the page language, so Chinese and Japanese pages display character forms appropriate to each language. It is suited to readers who regularly browse websites in different languages, study Japanese while also reading Chinese content, or care about regional differences in character forms.
 
 ![Chinese page in Linux Chrome: the extension selects the appropriate Chinese font and bold weight on the left; the original rendering is on the right](docs/images/bold-chinese-before-after.png)
 
-The page in this example is marked `lang="en-US"`. With the extension enabled (left), Chrome uses the appropriate Chinese font and bold weight. Without it (right), the text falls back to Regular.
+The Chinese page in this example identifies itself as English. With the extension enabled (left), Chrome uses the appropriate Chinese font and bold weight. Without it (right), the text loses its intended bold appearance.
 
-## How it works
+## Fonts and detection
 
-The extension handles **Simplified Chinese, Traditional Chinese, and Japanese**. A manual choice for a hostname takes precedence. With **Trust specific Chinese and Japanese language declarations** enabled (the default), a root or descendant `lang` that clearly identifies one of these variants is left to the browser. The extension does not rewrite that content's font CSS. Other language declarations do not suppress CJK font repair. Otherwise, page-level detection uses a bounded text sample and the browser's language detector, supplemented by kana and simplified/traditional character clues. When the browser's Chinese and Japanese scores are close, an additional check can use multiple distinct Japanese text segments to resolve the page as Japanese; that check does not rely on a single Japanese title quoted in Chinese prose. Bare root `lang="zh"` still needs Chinese script clues; if those cannot resolve the variant, **Default Chinese variant** decides. Shared Han characters and very short samples remain ambiguous.
+The extension handles **Simplified Chinese, Traditional Chinese, and Japanese**. It checks the page language and helps the browser use a suitable font. If the result is wrong, choose a language for that website from the toolbar popup.
 
-**Advanced mode**, the default, keeps the site's named fonts and changes their order only when needed. Normally, the selected font follows named families and goes just before the first generic family such as `sans-serif`. If a reachable named CJK family is recognized as belonging to the wrong region, the selected font moves ahead of the recognized regional families while retaining the site's Latin and unclassified families. The first generic family determines whether the Serif choice is used (`serif` or `ui-serif`); otherwise the Sans choice is used. In schematic form:
+Under **Settings → Font choices**, choose and preview installed Sans and Serif fonts for each language. **Same as Sans** uses that language's Sans font for both styles. The extension selects defaults from suitable installed fonts, preferring Noto Sans CJK for Sans and Noto Serif CJK for Serif. Other default candidates include common Windows and macOS fonts, for example:
 
-```text
-Website Latin font, Unclassified site font, sans-serif
-→ Website Latin font, Unclassified site font, Selected font, sans-serif
+| System | Sans candidates | Serif candidates |
+| --- | --- | --- |
+| Windows | Microsoft YaHei, Microsoft JhengHei, Yu Gothic | SimSun, PMingLiU, Yu Mincho |
+| macOS | PingFang SC/TC, Hiragino Sans | Songti SC/TC, Hiragino Mincho ProN |
 
-Website Latin font, Recognized SC font, sans-serif  [Japanese content]
-→ Website Latin font, Selected JP font, Recognized SC font, sans-serif
-```
+The actual choice depends on installed fonts. Suitable Noto fonts take priority on Windows and macOS too, when available.
 
-These are ordering diagrams, not literal CSS family names or platform-specific font assumptions. With the preservation options enabled, a suitable site-loaded CJK font or suitable available named CJK font normally prevents insertion altogether. A manual site choice takes precedence over the site's language declaration.
+### Modes
 
-**Simple mode** is opt-in. It changes only the root `lang` to `zh-CN`, `zh-TW`, or `ja` and does not inject per-element font CSS. The browser and operating system choose the actual font, so the font choices in Settings do not apply. It briefly watches for content rendered at startup, then stops once a language is found or after two seconds.
+- **Advanced mode** is the default. It uses your chosen fonts where correction is needed and keeps the website's Latin fonts. By default, it also checks content added later and corrects its fonts, so you generally do not need to switch to Simple mode.
+- **Simple mode** changes the page's language declaration so the browser can choose a font. Your font choices in Settings do not apply in this mode. It checks content appearing during startup, then stops watching later changes.
 
-Advanced mode also has **Detect clearly separated Chinese and Japanese text blocks (experimental)**, off by default. Without an active mixed-page result, the extension uses only the page's chosen regional font for content that needs CSS correction; trusted, specific `lang` declarations remain the browser's responsibility. The experiment activates only for automatically classified pages without a specific root CJK `lang` and with substantial evidence of both languages; a manual site choice keeps it off. Once active, it can choose different fonts for high-confidence direct text segments, including standalone kana or kana mixed only with recognized Japanese character clues. For a short segment with some matching clues, it can also consult one clearly identified preceding segment in the same content block. It does not change `lang` or the page-level result, does not split ordinary text at spaces, and leaves uncertain segments on the page result. Some multi-segment elements need temporary spans; turning the option off removes those spans, although adjacent text nodes may be merged.
+### Detection settings
 
-## Fonts and settings
+- **Trust specific Chinese and Japanese language declarations** leaves content to the browser when the website clearly identifies its language. Your manual website choice takes priority.
+- **Keep Chinese and Japanese fonts chosen by websites** preserves a suitable font supplied or named by the website. Fonts for the wrong language can still be corrected.
+- **Watch dynamic pages** corrects text added later and checks the language after navigation within the page, including Back/Forward. Expanding a comment or loading more items at the same address normally keeps the existing page language.
+- **Default Chinese variant** chooses Simplified or Traditional Chinese when the text does not provide enough clues.
 
-Under **Settings → Font choices**, you can preview and choose Sans and Serif fonts for Simplified Chinese, Traditional Chinese, and Japanese. The menus list fonts reported as installed by the browser. Defaults are selected from available regional candidates; on Linux, Noto Sans CJK is preferred when installed. Leaving a Serif choice at **Same as Sans** uses that language's Sans choice. Changes save automatically to browser sync storage.
+The first three options are on by default. **Detect clearly separated Chinese and Japanese text blocks (experimental)** is off by default. It can use different fonts for separate Chinese and Japanese passages on automatically detected pages containing substantial amounts of both languages. A manual website choice keeps it off. It can misclassify short passages or affect page appearance; uncertain text keeps the page's language choice.
 
-**Keep Chinese and Japanese fonts chosen by websites** covers both fonts provided by the page and installed fonts it names. When a website's CSS specifies a font suitable for the current language, the extension does not place your selected font ahead of it. A known wrong-region family does not block the correction; an available Fangsong face is protected for Chinese text, but not ahead of a Japanese font for Japanese text. Web fonts split into Unicode subsets are not required to have every subset downloaded before they can be respected.
+For font ordering and detection algorithms, see the [architecture guide](docs/architecture.md).
 
-With **Watch dynamic pages** enabled (the default), Advanced mode corrects fonts in text that appears later and rechecks the page language after an in-page navigation. Expanding a comment or adding a feed item at the same URL does not replace an existing page-wide language choice. Disabling the option stops content changes from triggering font correction for text added afterward; font loading or settings changes can still trigger a style pass. Elements with the same final font stack share a CSS rule instead of carrying duplicate inline styles. The extension starts before all page fonts finish loading and avoids repeated full language detection on pages without CJK text.
+## Website language settings
 
-Experimental mixed-language detection is off by default. Enabling it requires confirming a warning about possible misclassified text and altered page appearance; canceling leaves it off.
+By default, the extension detects the page language automatically. You can use the toolbar popup to choose which language’s fonts to use for a specific website, or disable the extension on that website.
 
-The popup lets you set a site to **Auto, Simplified Chinese, Traditional Chinese, Japanese, or Disabled**. Popup changes apply to the current hostname. In Settings, choose **Whole domain** when adding a site to include all subdomains of its registered domain. Exact hostname choices take priority. **Auto** for a hostname explicitly bypasses a domain choice; remove the hostname entry in **Manage site language settings** to restore the domain choice. Remove a domain entry in Settings to delete its rule. Both scopes can be viewed, added, edited, or removed under **Manage site language settings**. Existing saved choices remain exact hostname choices. **Delete all site settings** clears only site choices; the main **Restore defaults** action does not.
+Use **Settings → Manage site language settings** to manage website languages and their scope.
 
-The interface follows the browser's language: English, Japanese, Simplified Chinese, or Traditional Chinese. If the browser language is not supported, the interface uses English. There is no separate language picker.
+### Apply to
 
-The site manager groups rules by language. Use its search box to find a website across all groups and pages; each expanded group shows ten rules per page. **Add website** opens an empty dialog. Click a saved website to edit its hostname, language, or **Apply to** scope, or remove it. Canceling or closing the dialog discards the draft. Moving a rule between hostname and whole-domain scope preserves other rules and rejects a conflicting destination. **Hide site language settings** collapses the manager with its original animation; reduced-motion preferences disable that animation.
+| Choice | Example |
+| --- | --- |
+| **Exact match** | `news.example.com` affects only that address, not `example.com` or `shop.example.com`. |
+| **Include subdomains** | Entering `news.example.com` creates a setting for `example.com` and all its subdomains. |
+
+These choices apply to website names, not individual pages or URL paths. **Exact match** takes priority over **Include subdomains**. Popup changes apply only to the current website name.
+
+The interface follows the browser's language: English, Japanese, Simplified Chinese, or Traditional Chinese, with English as the fallback.
 
 ## Checking the current page
 
-Click the toolbar icon to see **HTML lang**, the page's selected or detected variant, and whether the extension intervened. The **Mode** row identifies **Advanced · Font correction** or **Simple · lang only**. When correction is active, Advanced mode also shows **Applied fonts** (configured families the extension actually added to CSS), **CSS intervention**, and **Managed elements**. These report what the extension did, not the physical font Chromium rendered for every glyph. Simple mode shows **Applied lang** when a root language is applied. These intervention rows are hidden when the extension is inactive. If experimental mixed-language detection finds local variants, the detection row lists them alongside the stable page-level result.
+Click the toolbar icon to see the page's language and whether correction is active. **HTML lang** is the language declared by the website, which may differ from the detected language.
 
-The icon reflects **use on the current page**: the book opens when Advanced mode manages at least one font change or Simple mode applies a root `lang`. Simple mode counts as applied even if the root already has the same value. Otherwise the book stays closed. Chrome internal pages, the Chrome Web Store, and some other protected pages do not permit content scripts.
+The book opens when the extension applies font correction or sets the page language in Simple mode. Both the toolbar and popup book stay closed when neither is active. By default, the extension trusts explicit Chinese or Japanese `lang` declarations and preserves suitable Chinese and Japanese fonts already used by the website.
+
+During font correction, **Applied fonts**, **CSS intervention**, and **Managed elements** show the extension's font changes and how many page elements it handles. These details are hidden when inactive. In Simple mode, **Applied lang** shows the language set by the extension. These are activity indicators, not proof of which font the browser used to draw every character.
+
+Chrome internal pages, the Chrome Web Store, and other protected pages cannot run the extension.
 
 ## Installation
-
-Requires Chrome/Chromium 153 or newer. The `publicSuffix` permission uses the browser’s domain list to match whole-domain choices.
 
 1. Extract the release ZIP.
 2. Open `chrome://extensions` and turn on **Developer mode**.
@@ -70,7 +82,7 @@ To build from source, run `npm ci` and `npm run build`, then load the generated 
 The source uses TypeScript, Vite, and Manifest V3, with no third-party runtime dependencies. See the [architecture guide](docs/architecture.md) for the modules and runtime flow, [design decisions](docs/decisions.md) for intentional constraints, and [testing notes](docs/testing.md) for browser checks.
 
 ```sh
-npm install
+npm ci
 npm test
 npm run test:sites
 npm run build
