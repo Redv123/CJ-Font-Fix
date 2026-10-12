@@ -1,4 +1,4 @@
-import { composedParentElement, isInsideBody } from "./candidate-scan";
+import { CJK_TEXT_RE, closestComposed, composedParentElement, EXCLUDED, isInsideBody } from "./candidate-scan";
 
 export interface PendingPageUpdate {
   fullScan: boolean;
@@ -22,6 +22,41 @@ export class UpdateQueue {
 
   get hasWork(): boolean {
     return this.fullScan || this.redetectLanguage || this.roots.size > 0 || this.elements.size > 0;
+  }
+
+  /** Bound work performed immediately after a user interaction. */
+  isSmallLocalUpdate(): boolean {
+    if (this.fullScan || this.redetectLanguage || !this.hasWork || this.roots.size + this.elements.size > 128) return false;
+    let nodes = 0;
+    let characters = 0;
+    let containsCjk = false;
+    const fits = (node: Node): boolean => {
+      if (++nodes > 128 || (node instanceof Element && node.shadowRoot)) return false;
+      const text = node.nodeType === Node.TEXT_NODE ? node.nodeValue || "" :
+        node instanceof HTMLElement && (node.tagName === "INPUT" || node.tagName === "TEXTAREA")
+          ? (node as HTMLInputElement).value || (node as HTMLInputElement).placeholder || "" : "";
+      characters += text.length;
+      if (characters > 10000) return false;
+      if (!containsCjk && CJK_TEXT_RE.test(text)) {
+        const owner = node instanceof Element ? node : node.parentElement;
+        containsCjk = !closestComposed(owner, EXCLUDED);
+      }
+      return true;
+    };
+    for (const root of this.roots) {
+      if (!root.isConnected || this.hasQueuedAncestor(root, false)) continue;
+      if (!fits(root)) return false;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ALL);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!fits(node)) return false;
+      }
+    }
+    for (const element of this.elements) {
+      if (!element.isConnected || this.hasQueuedAncestor(element, true)) continue;
+      if (!fits(element)) return false;
+      for (const child of element.childNodes) if (!fits(child)) return false;
+    }
+    return containsCjk;
   }
 
   requestFullScan(redetectLanguage = false): void {

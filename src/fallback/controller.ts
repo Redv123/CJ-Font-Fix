@@ -90,6 +90,10 @@ export class FallbackController {
 
     if (entries.length) this.fontSupport.refreshCustomFonts();
 
+    // A former direct text owner can now be the new owner's parent. Remove
+    // its obsolete fallback before reading styles inherited by the new child.
+    for (const element of affected) this.managedStyles.restore(element);
+
     // Extension styles were removed in resolveEntries. All computed-style
     // reads can now happen together against the website's own font stacks.
     for (const entry of entries) {
@@ -97,7 +101,6 @@ export class FallbackController {
     }
 
     const actions = this.createStyleActions(entries, settings);
-    for (const element of affected) this.managedStyles.restore(element);
     for (const action of actions) this.managedStyles.commit(action);
     return this.managedStyles.summary();
   }

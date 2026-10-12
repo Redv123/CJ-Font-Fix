@@ -31,7 +31,7 @@ interface PageObserverDependencies {
 /**
  * Converts browser DOM mutations into coalesced page-update requests.
  *
- * This module never detects a language and never applies a fallback. It only
+ * This module never detects a language or computes a font stack. It only
  * decides whether a mutation invalidates page detection, a whole subtree, or
  * one direct text owner. Keeping that policy here prevents the application
  * lifecycle from depending on MutationObserver details.
@@ -90,7 +90,11 @@ export class PageObserver {
           rules.recreateAfterRemoval();
         }
         for (const node of mutation.removedNodes) {
-          cleanedManagedContent = managedStyles.releaseRemovedSubtree(node) || cleanedManagedContent;
+          cleanedManagedContent = managedStyles.releaseRemovedSubtree(node,
+            dynamic && !redetectPage && mutation.removedNodes.length === 1 &&
+              !this.dependencies.settings().mixedLanguageDetection
+              ? mutation.target : undefined
+          ) || cleanedManagedContent;
         }
         for (const node of mutation.addedNodes) {
           if (node instanceof Element) addedElements.add(node);

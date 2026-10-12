@@ -168,6 +168,17 @@ function startContentApplication(): void {
     else scheduleRun();
   }
 
+  document.addEventListener("click", () => {
+    // Let page handlers finish inserting content before checking queued work.
+    queueMicrotask(() => {
+      if (applying || settings.simpleMode || !settings.dynamicDetection ||
+          !detection.variant || settings.mixedLanguageDetection || !updates.isSmallLocalUpdate()) return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = 0;
+      void run();
+    });
+  });
+
   function reportActionState(inUse: boolean): void {
     if (window !== window.top) return;
     const message: ActionStateMessage = { type: "setActionState", inUse };

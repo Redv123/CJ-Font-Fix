@@ -1,5 +1,5 @@
 import { FontStackRules } from "./font-stack-rules";
-import { composedParentElement } from "../page/candidate-scan";
+import { closestComposed, composedParentElement, EXCLUDED, isInsideBody, isInShadowTree } from "../page/candidate-scan";
 import type { Variant } from "../shared/types";
 
 export interface AppliedStyleState {
@@ -179,29 +179,44 @@ export class ManagedStyles {
     for (const element of Array.from(this.elements)) this.restore(element);
   }
 
-  releaseRemovedSubtree(node: Node): boolean {
+  releaseRemovedSubtree(node: Node, replacementTarget?: Node): boolean {
     if (!(node instanceof Element)) return false;
     let released = false;
+    let replacement: AppliedStyleState | undefined;
+    const restoreRemoved = (element: HTMLElement): void => {
+      const state = this.states.get(element);
+      if (!state) return;
+      // Only a single font owner can safely supply a temporary replacement.
+      replacement = released ? undefined : state;
+      this.restore(element);
+      released = true;
+    };
     const release = (root: Element | ShadowRoot): void => {
-      if (root instanceof HTMLElement && this.states.has(root)) {
-        this.restore(root);
-        released = true;
-      }
+      if (root instanceof HTMLElement) restoreRemoved(root);
       if (root instanceof Element && root.shadowRoot) {
         release(root.shadowRoot);
       }
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
       for (let element = walker.nextNode(); element; element = walker.nextNode()) {
-        if (element instanceof HTMLElement && this.states.has(element)) {
-          this.restore(element);
-          released = true;
-        }
+        if (element instanceof HTMLElement) restoreRemoved(element);
         if (element instanceof Element && element.shadowRoot) {
           release(element.shadowRoot);
         }
       }
     };
     release(node);
+    // Some renderers briefly replace formatted text with an empty text node.
+    // Keep its font through reconstruction; the queued scan reevaluates it.
+    if (replacement && !node.isConnected && replacementTarget instanceof HTMLElement && isInsideBody(replacementTarget) &&
+        !closestComposed(replacementTarget, EXCLUDED) &&
+        !this.has(replacementTarget) && replacementTarget.childNodes.length === 1 &&
+        replacementTarget.firstChild?.nodeType === Node.TEXT_NODE && !replacementTarget.firstChild.nodeValue) {
+      const inlineFallback = isInShadowTree(replacementTarget) ||
+        replacementTarget.style.getPropertyPriority("font-family") === "important";
+      this.commit({ ...replacement, element: replacementTarget, inlineFallback,
+        originalInlineValue: replacementTarget.style.getPropertyValue("font-family"),
+        originalInlinePriority: replacementTarget.style.getPropertyPriority("font-family") });
+    }
     return released;
   }
 

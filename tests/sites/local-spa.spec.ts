@@ -74,6 +74,152 @@ test("does not trust an English body lang for Chinese content", async () => {
   }
 });
 
+test("keeps the selected font in every frame when hover replaces managed text", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({ fontJP: "CJ Test Japanese", preserveWebsiteFonts: false,
+      dynamicDetection: true, simpleMode: false, trustCjkLang: true });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/hover-replacement", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<html lang="en"><head><title>日本語の動画紹介</title><style>
+        #description { padding: 24px; font-family: "Site Latin", sans-serif; }
+        #description:hover { background: #eef6ff; }
+      </style></head><body><main><div id="description"><span id="snippet">${JAPANESE.repeat(3)}</span></div></main>
+      <script>
+        const description = document.querySelector('#description');
+        function replaceSnippet() {
+          const text = description.textContent;
+          description.replaceChildren(document.createTextNode(''));
+          queueMicrotask(() => {
+            const wrapper = document.createElement('span');
+            description.replaceChildren(wrapper);
+            queueMicrotask(() => {
+              const next = document.createElement('span');
+              next.id = 'snippet';
+              wrapper.append(next);
+              const content = document.createTextNode('');
+              next.append(content);
+              queueMicrotask(() => { content.nodeValue = text; });
+            });
+          });
+        }
+        description.addEventListener('mouseenter', replaceSnippet);
+        description.addEventListener('mouseleave', replaceSnippet);
+      </script></body></html>`
+    }));
+    await page.goto("https://fixture.test/hover-replacement");
+    await page.bringToFront();
+    await expect.poll(() => page.locator("#snippet").evaluate((element) => getComputedStyle(element).fontFamily))
+      .toContain("CJ Test Japanese");
+    await expect.poll(async () => (await currentStatus()).pageVariant).toBe("jp");
+    await page.mouse.move(600, 500);
+    await page.waitForTimeout(400);
+    for (const hovering of [true, false]) {
+      await page.evaluate(() => {
+        const samples: string[] = [];
+        Object.assign(window, { hoverFontSamples: samples });
+        const end = performance.now() + 300;
+        const sample = () => {
+          samples.push(getComputedStyle(document.querySelector("#snippet") || document.querySelector("#description")!).fontFamily);
+          if (performance.now() < end) requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      });
+      if (hovering) await page.locator("#description").hover();
+      else await page.mouse.move(600, 500);
+      await page.waitForTimeout(320);
+      const samples = await page.evaluate(() => (window as unknown as { hoverFontSamples: string[] }).hoverFontSamples);
+      expect(samples.length).toBeGreaterThan(3);
+      expect(samples.filter((family) => !family.includes("CJ Test Japanese"))).toEqual([]);
+    }
+    // The temporary parent style must disappear when the replacement is no
+    // longer CJK, and normal correction must still work after new text arrives.
+    await page.locator("#description").evaluate((element) => {
+      element.replaceChildren(document.createTextNode(""));
+      queueMicrotask(() => { element.textContent = "An English description"; });
+    });
+    await expect.poll(() => page.locator("#description").evaluate((element) => getComputedStyle(element).fontFamily))
+      .toBe('"Site Latin", sans-serif');
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(0);
+    await page.locator("#description").evaluate((element, text) => { element.textContent = text; }, JAPANESE.repeat(3));
+    await expect.poll(() => page.locator("#description").evaluate((element) => getComputedStyle(element).fontFamily))
+      .toContain("CJ Test Japanese");
+    await page.locator("#description").evaluate((element) => element.remove());
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(0);
+  } finally {
+    await page.close();
+  }
+});
+
+test("corrects newly expanded content on an ordinary website before its first visible frame", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({ fontJP: "CJ Test Japanese", preserveWebsiteFonts: false,
+      dynamicDetection: true, simpleMode: false, mixedLanguageDetection: false });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/expanded-content", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<html lang="en"><head><title>日本語の動画紹介</title><style>
+        #description { font-family: "Site Latin", sans-serif; }
+      </style></head><body><main><div id="description">
+        <div id="preview">${JAPANESE.repeat(3)}</div>
+        <div id="expanded" hidden></div><button id="show-details">Show details</button>
+      </div></main><script>
+        document.querySelector('#show-details').addEventListener('click', () => {
+          const expanded = document.querySelector('#expanded');
+          expanded.hidden = !expanded.hidden;
+          document.querySelector('#preview').hidden = !expanded.hidden;
+          if (expanded.hidden || expanded.childNodes.length) return;
+          queueMicrotask(() => {
+            const full = document.createElement('span');
+            full.id = 'full-description';
+            full.textContent = ${JSON.stringify(JAPANESE.repeat(6))};
+            expanded.append(full);
+          });
+        });
+      </script></body></html>`
+    }));
+    await page.goto("https://fixture.test/expanded-content");
+    await page.bringToFront();
+    await expect.poll(() => page.locator("#preview").evaluate((element) => getComputedStyle(element).fontFamily))
+      .toContain("CJ Test Japanese");
+    await page.evaluate(() => {
+      const samples: string[] = [];
+      Object.assign(window, { expandedFontSamples: samples });
+      const end = performance.now() + 400;
+      const sample = () => {
+        const full = document.querySelector("#full-description");
+        if (full?.getClientRects().length) samples.push(getComputedStyle(full).fontFamily);
+        if (performance.now() < end) requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
+    await page.locator("#show-details").click();
+    await page.waitForTimeout(420);
+    const samples = await page.evaluate(() => (window as unknown as { expandedFontSamples: string[] }).expandedFontSamples);
+    expect(samples.length).toBeGreaterThan(3);
+    expect(samples.filter((family) => !family.includes("CJ Test Japanese"))).toEqual([]);
+    await page.locator("#full-description").evaluate((element) => element.setAttribute("data-retained", "yes"));
+    await page.locator("#show-details").click();
+    await expect(page.locator("#full-description")).toBeHidden();
+    await page.locator("#show-details").click();
+    await expect(page.locator("#full-description")).toBeVisible();
+    await expect(page.locator("#full-description")).toHaveAttribute("data-retained", "yes");
+    expect(await page.locator("#full-description").evaluate((element) => getComputedStyle(element).fontFamily))
+      .toContain("CJ Test Japanese");
+    await worker.evaluate(() => chrome.storage.sync.set({ siteOverrides: { "fixture.test": "off" } }));
+    await expect.poll(() => page.locator("#full-description").evaluate((element) => getComputedStyle(element).fontFamily))
+      .toBe('"Site Latin", sans-serif');
+  } finally {
+    await page.close();
+  }
+});
+
 test("uses only the page font when mixed detection is off despite bare zh descendants", async () => {
   await worker.evaluate(async () => {
     await chrome.storage.sync.clear();
