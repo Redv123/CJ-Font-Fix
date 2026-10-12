@@ -1,45 +1,75 @@
 # Design decisions and known limits
 
-This records constraints agreed during development so later changes do not silently reverse them. It describes current behavior unless a section explicitly says **not implemented**. The README is the user guide; [architecture](architecture.md) maps these decisions to code.
+These are the behavioral constraints and reasons to preserve when changing the project. [Architecture](architecture.md) describes the overall flow; [runtime details](runtime-details.md) describes implementation. Verify changes through [testing](testing.md).
 
-## Product boundary
+## Product scope and modes
 
-- The primary job is to repair missing or wrong Chinese/Japanese fallback and bold matching in Linux Chromium. Correct SC/TC/JP glyph forms are a second benefit. Korean detection, a separate Mono font control, translation, and changing website copy are outside the current scope.
-- Advanced mode is the default and preserves explicit website Latin families. Simple mode is a separate root-`lang` strategy, not a second layer of advanced CSS. Do not expand Simple mode into per-element font injection.
-- Do not choose an unrelated installed font merely to fill an empty regional setting. If no suitable configured regional font exists, CSS fallback for that region stays inactive. Font family names and ordering must not assume only Linux: Windows and macOS families can appear in website CSS.
-- A specific root CJK `lang` is intentional browser context. With the trust setting on, leave the entire page to the browser without sampling content or scanning elements for font injection, even if descendants declare their own languages. On pages without a trusted specific root, trust only descendant `lang` values that identify a supported SC, TC, or JP variant. Other language tags do not suppress CJK repair; this is a positive allowlist, not an English exception. Do not inject just because the browser renders a glyph differently from our preference. A user's explicit site override is the exception. Bare root `zh` still needs SC/TC resolution for the page result; bare descendant `zh` is not trusted for skipping repair and does not select another injected font while mixed-language mode is inactive.
+- The primary job is to repair Chinese/Japanese fallback and bold matching in Linux Chromium. Correct SC/TC/JP character forms are another benefit. Translation, website-copy changes, and a separate Mono font control are outside scope.
+- Advanced mode is the default and preserves website Latin fonts. Simple mode changes only the root `lang`; it must remain separate from element-level font injection.
+- Use suitable configured regional fonts. An unrelated installed font must not fill an empty regional choice; without a suitable choice, CSS fallback for that region stays inactive.
 
-## Automatic versus mixed-language detection
+## Page language and sampling
 
-- Optimize the default path for ordinary single-language pages. Most sites do not annotate a second language, but that does not justify guessing and wrapping every inline mixture. An untagged Chinese paragraph can quote Japanese text without becoming a Japanese paragraph.
-- Mixed-language handling is an **opt-in experiment**, limited to advanced mode, untagged automatic sites, and pages with substantial evidence for both Chinese and Japanese. It is not enabled for a manual override or root CJK declaration. Ambiguous text inherits the page result.
-- Outside an active mixed-page decision, the extension injects at most the font chosen for the page variant, even if descendants have a bare `lang=zh`. Trusted specific descendant declarations remain browser-owned and are not counted as injected fonts. A saved THBWiki lyrics page exposed the old leak: its root was `en`, its content used bare `zh`, and Advanced mode injected SC, TC, and JP despite mixed detection being off.
-- The Settings checkbox requires an explicit warning confirmation each time it is switched on. Canceling or dismissing the dialog must not write an enabled value; switching it off needs no confirmation. This is a Settings UI gate, not a new per-page prompt or a storage schema change.
-- Once substantial mixed-language evidence has activated the experiment, an independent segment containing only kana, or kana plus recognized Japanese character clues, may use JP even when it is too short for the ordinary local threshold. A segment that also contains shared Han remains uncertain unless a directly preceding, independently classified Japanese segment supplies context. Such short segments cannot activate the experiment themselves; a Chinese sentence containing a Japanese quote is not reclassified as a whole.
-- If a segment remains ambiguous, mixed mode may look back to one immediately preceding, independently classified segment in the same direct-text owner or a peer paragraph. It requires matching clues in the current segment, does not chain context-derived guesses, and stops at block or explicit-language boundaries. This can resolve short Chinese or Japanese lines without changing the page result. Later changes to the preceding segment must invalidate the dependent choice.
-- Japanese kana is strong evidence in context; a fixed list of Japanese-created or Japanese-form characters is only a heuristic. It is not a language dictionary. The list is kept in `japanese-character-clues.ts`; changes must preserve the documented Chinese-exemplar exclusion and cite their source in `japanese-character-clues-research.md`. Strong classification from that list requires at least two distinct clues when kana has not already cleared its own threshold. A Chinese sentence containing a Japanese place or work name can still be a false positive if the experiment is enabled. This is a known risk, not an assertion that the threshold is ideal. Do not increase confidence merely by expanding the list without real counterexamples.
-- Do not split generic inline text on spaces. Chinese and Japanese can mix without spaces, and spaces around a title are not a dependable language boundary. The Bangumi `大家将 [title] 标注为` structure is a narrow site adapter, not a rule for other websites. Do not advertise that exact template as a general capability.
-- A proposal to remove already-classified blocks and call `chrome.i18n.detectLanguage()` a second time on the remainder has **not been implemented**. No per-element browser-language calls or iterative exclusion loop exist. The mixed path uses local evidence on candidates and leaves the page result stable.
-- The page sample prefers `main` or `[role=main]`. With one article it uses that article; with multiple articles it uses the nearest common ancestor of the first two, capped at 10,000 characters. A saved DuckDuckGo search page showed why: its first article was a Swedish ad and later result articles were Japanese. If no articles exist, it uses `body`. Keep the sample bounded and avoid switching ordinary single-article pages to whole-body scanning.
-- After automatic detection has produced a non-empty page result, ordinary same-URL DOM additions must not replace it. Newly displayed text still receives font correction using the current page variant, but an expanded comment or feed item cannot switch the whole page from SC to TC or JP. Re-detection remains valid for an actual SPA URL change, browser history traversal, root-language change, settings change, an unresolved page that later gains enough CJK text, or clear replacement of the sampled view itself. The latter is intentionally narrow: removing the sample root or changing multiple existing sampled CJK text nodes to non-CJK can invalidate the page; one appended or edited comment cannot.
-- When browser Chinese and Japanese scores are close, distinct Japanese segments can resolve an otherwise ambiguous page. This is a page-level exception for multiple corroborating segments, not the opt-in mixed-language feature and not a rule that one Japanese work title makes surrounding Chinese text Japanese. Duplicate segment strings are ignored only for this corroboration; the detector's page sample is not deduplicated.
-- Re-select the language sample when a `role` change actually switches the primary content region. Cached SPA views can leave the old region connected after a history scan has read it; this must wake even a no-CJK page. Unrelated roles and role changes that leave the selected region unchanged do not schedule font work. Use the existing coalesced scheduler rather than adding a fixed wait for navigation.
-- Do not filter the page sample by `checkVisibility()` on each text node's parent or deduplicate all repeated text without a demonstrated wrong result. A parent using `display: contents` can fail such a visibility check while its text is visible, and repeated titles or interface text can be legitimate language evidence. Content hidden at one moment may later become visible; any future visibility filter also needs a way to invalidate the cached language result when visibility changes.
+### Declarations and priority
 
-## Fonts, state, and browser boundaries
+- A manual site choice takes priority over declarations and automatic detection.
+- With trust enabled, a specific root SC/TC/JP declaration leaves the entire page to the browser, including nested and dynamically added content. Different rendering alone is not a reason to override that declaration.
+- Without a trusted specific root, trust descendant declarations identifying supported SC/TC/JP variants. Other language tags do not suppress CJK font repair. Bare root `zh` needs SC/TC resolution; bare descendant `zh` neither skips repair nor selects another font while mixed detection is inactive.
+- Ordinary pages use one page variant for extension-applied fonts. Trusted descendants remain browser-owned. Optimize this path for single-language reading; one quoted Japanese title does not make Chinese prose a mixed page.
 
-- The extension can read CSS stacks and available font metadata, but cannot ask Chromium which physical font rendered each glyph. A `data-cjk-fallback-local` marker is a local language decision; it does not prove that the regional font won CSS selection. Verify actual output with DevTools **Rendered Fonts** when diagnosing a font complaint.
-- One website-font preference covers both declared CJK font faces and suitable installed families named by the website. An old profile with either of the former separate preferences enabled migrates to enabled; both disabled migrates to disabled. A declared Unicode subset need not be loaded before it is needed; only a face already in `error` state is excluded from that evidence. An explicitly named Fangsong family is not a CSS generic: when the availability probe finds it, preserve it for Chinese text even if its name has a different Chinese regional suffix, provided website-font preservation is enabled. For Japanese text, insert the Japanese fallback ahead of Fangsong; if Fangsong is unavailable, normal regional insertion applies. Keep Latin families ahead of inserted fallbacks. Do not assume `FangSong` is a portable family name: Windows lists `FangSong`, while macOS lists `STFangsong`, and Linux availability depends on installed packages. Never bake an example such as `PingFang SC` into the insertion algorithm.
-- CSS Fonts 4 dropped `emoji` as a generic font family. Treat a bare `emoji` in a website stack as an explicit family name, just like `Apple Color Emoji`, and do not move a selected CJK fallback ahead of an early emoji family. Emoji families after the first generic do not change where the CJK fallback is inserted.
-- The toolbar icon represents **use**, not detection: open book only for applied CSS or an applied Simple-mode root language; closed book otherwise. There is no navigation timer. Chromium restores the closed manifest icon on cross-document navigation, and an active page's content-script report reopens it. Protected pages may not send a content-script status at all.
-- Site overrides default to exact hostname scope. Users can explicitly select whole registered-domain scope; exact hostname choices take priority. A hostname `Auto` choice is persisted only when it bypasses an existing domain rule. Without that rule it is the default and removes the hostname record; old redundant automatic records are omitted from the manager and cleaned on extension updates and rule writes. Removing a hostname choice restores inheritance; domain `Auto` removes the domain rule. The site manager's delete-all action and the main settings restore action have different scopes. Browser locale selects English, Japanese, Simplified Chinese, or Traditional Chinese UI; there is no manual language picker.
-- Delete all site settings offers Undo while the Settings page remains open. Undo restores both scopes and keeps newer choices when the same website has been edited since deletion.
-- Individual site rules are deleted with one click on their delete icon, without a confirmation step.
-- Site language settings show counts within language groups. The section title has no total or search-result count.
-- Site creation uses the toolbar's inline form. Search stays visible even when there are no saved rules; Manage/Hide controls the entire manager. Entering a search term or an unfinished creation draft does not add a rule.
-- If the installed-font list cannot be read or is empty, font choices and Restore defaults are unavailable. Mode, detection, and site settings remain usable, and their saves preserve existing font choices. Missing recommended default fonts does not disable manual selection.
-- Open shadow roots can be managed when discovered; closed roots cannot. A root attached to an already-connected host with no observable mutation may wait for a later scan. Code-like and non-prose elements are not font candidates.
+### Sampling and stability
 
-## How to change these decisions
+- Prefer primary reading content and keep samples bounded. On multiple-article pages, use a shared container rather than only the first article: an advertisement can otherwise hide the language of the results. Selection order and limits are in [runtime details](runtime-details.md#language-sampling).
+- Keep an established page result during ordinary same-URL additions. Expanding a comment or loading feed items must not change the whole page's language.
+- Re-detection is valid for navigation, Back/Forward, root-language or settings changes, unresolved pages gaining CJK content, and substantial replacement of the sampled region. Removing that region or rewriting multiple existing sampled CJK nodes qualifies; a single appended or edited comment does not.
+- Re-select the sample when a `role` change actually switches primary content, even on a no-CJK page. Cached SPA views can remain connected after a history scan reads the old view. Other role changes cause no font work; use the existing scheduler without adding a fixed navigation wait.
+- A close browser Chinese/Japanese result may use multiple independently supported Japanese passages for corroboration. This is a page-level decision, separate from experimental mixed detection. Duplicate passages count once for corroboration; the original sample is not deduplicated.
+- Retain sample text without per-parent `checkVisibility()` filtering or broad deduplication unless a demonstrated failure justifies changing it. `display: contents` can make visible text fail a parent check, and repeated titles can be valid evidence. Any visibility filter also needs to invalidate results when visibility changes.
 
-Use a real affected page and a before/after observation for changes to language inference, font order, icons, or startup performance. Check the common single-language path as well as the reported edge case. Add a focused regression test when behavior changes, but do not treat synthetic character ratios alone as proof of a real need. Keep experiments disabled by default until they are shown not to damage the majority path. See [testing](testing.md) for the existing suite and performance-test expectations.
+## Experimental mixed-language detection
+
+### Activation and consent
+
+- Keep the experiment off by default, Advanced-only, and restricted to automatically classified pages without a root CJK declaration or manual site choice. Both languages must have substantial evidence; uncertain passages use the page result.
+- Enabling the Settings checkbox requires warning confirmation each time. Cancel or dismissal leaves it off; disabling needs no confirmation. This is a Settings gate, without a new per-page prompt or storage schema.
+- Local decisions leave root and element `lang` declarations and the page result unchanged.
+
+### Short passages and context
+
+- After activation, independent passages consisting of kana, or kana plus recognized Japanese character clues, may use JP below the ordinary text-length threshold. Short passages cannot activate the experiment themselves.
+- Shared Han in a short passage remains uncertain unless matching clues and one directly preceding, independently classified passage support it. Context-derived guesses cannot propagate.
+- Context is limited to the same direct-text owner or a peer paragraph and stops at block, explicit-language, and large line-break boundaries. Changing or removing the predecessor must invalidate its dependent decision.
+- Character clues are heuristics, not dictionaries. Preserve Chinese-exemplar exclusions and source attribution in [the character research note](japanese-character-clues-research.md). Strong classification from these clues needs at least two distinct clues when kana has not met its threshold. Expanding a clue set alone must not increase confidence; Japanese names quoted in Chinese can still be false positives.
+- Preserve ordinary inline text instead of splitting at spaces. The Bangumi heading adapter handles one fixed template and must remain a site-specific exception.
+
+### Unimplemented proposal
+
+Removing classified blocks and making another browser-language call on the remainder has **not been implemented**. The mixed path uses local evidence; it has no per-element browser-language calls or iterative residual-text loop.
+
+## Font preservation and ordering
+
+- Preserve website Latin families and support stacks from all platforms. Runtime font composition must not assume a Linux-specific stack.
+- One website-font preference covers declared CJK faces and suitable installed families named by the website. Legacy preferences migrate to enabled if either was enabled, otherwise disabled.
+- Declared Unicode subsets may be respected before all subsets download; an errored face does not count as suitable coverage.
+- Preserve an available named Fangsong font for Chinese when preservation is enabled, including names with another Chinese regional suffix. For Japanese, put the Japanese fallback before Fangsong. Probe availability rather than assuming a portable family name: Windows and macOS use different names.
+- Treat bare `emoji` as a named family. Keep early emoji families ahead of the inserted CJK fallback; those after the first generic do not affect insertion.
+
+## Site language settings
+
+- Default to **Exact match**; **Include subdomains** uses registered-domain scope. Exact choices take priority, and scope never depends on URL paths.
+- Keep hostname Auto only when it bypasses an existing domain rule. Otherwise it is a redundant default and leaves no record. Remove obsolete defaults on rule writes and extension updates. Deleting a hostname rule restores inheritance; domain Auto removes its rule.
+- **Restore defaults** and site-rule deletion have separate scopes. Delete all offers Undo while Settings remains open; restoration keeps newer choices on conflicting records.
+- Delete individual rules with one click, without confirmation. Show counts within language groups, with no total on the section heading.
+- Creation and editing use inline forms. Search remains visible when the list is empty, and Manage/Hide controls the whole manager. Search text and unfinished drafts do not create rules.
+- When the installed-font list is unavailable or empty, disable font choices and Restore defaults while preserving saved fonts. Mode, detection, and site controls remain usable. Missing recommended fonts alone must not disable manual selection.
+
+## Browser and UI behavior
+
+- Both book icons indicate actual intervention: applied Advanced CSS or an applied Simple-mode language. Detection alone does not open them. Protected pages may not supply status.
+- Follow browser UI language using English, Japanese, Simplified Chinese, or Traditional Chinese locales, with English fallback and no manual language picker.
+- Support discovered open shadow roots; closed roots cannot be inspected. A root attached to an already-connected host without an observable mutation can wait for another scan. Code-like and non-prose content remains excluded.
+- Extension markers and computed font lists do not prove which physical font drew each character. Use DevTools **Rendered Fonts** for physical-font complaints.
+
+## Changing these decisions
+
+Use an affected page and before/after observations for language, font order, icon, or performance changes. Check the ordinary single-language path and add a focused regression for changed behavior. Synthetic character ratios alone do not establish a need; experimental behavior stays opt-in until broader evidence supports it.

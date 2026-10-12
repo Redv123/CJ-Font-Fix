@@ -1,6 +1,12 @@
 # Testing and browser evidence
 
-The tests answer different questions. A passing unit test proves a deterministic rule; it does not prove that the website's CSS, Chromium's font matching, or the toolbar state is correct. Read [architecture](architecture.md) for code owners and [design decisions](decisions.md) before changing behavior.
+Choose checks for the behavior being changed. Unit tests establish deterministic rules; browser checks establish DOM, CSS, and extension interaction. Physical font complaints also require DevTools **Rendered Fonts**. Use [code map](code-map.md) to find the owner and [design decisions](decisions.md) before changing policy.
+
+## Choose the check
+
+- For language clues, font ordering, queues, or stored-value rules, start with the relevant unit tests.
+- For page behavior, popup/Settings interactions, restoration, or navigation, rebuild and run the relevant browser case.
+- For performance changes, compare the same page and browser conditions and verify that language, fonts, icons, and restoration still behave correctly.
 
 ## Commands
 
@@ -17,54 +23,40 @@ The tests answer different questions. A passing unit test proves a deterministic
 | `npm run inspect:flatpak -- 'https://example.com/page'` | Open any HTTP(S) page with the built extension in visible Flatpak Chromium; pause for manual verification and print the final extension status |
 | `CJ_FLORES_DIR=.local-test-data/flores200_dataset npm run test:corpus` | Opt-in FLORES-200 page-language evaluation in real Chromium |
 
-`tests/sites/real-sites.spec.ts` currently covers an ordinary DuckDuckGo search, Japanese/SC/TC Wikipedia, Bangumi, and a Japanese YouTube channel with mixed-script video titles. It also checks opt-in Bangumi mixed text, the selected Japanese stack, wrapper restoration, and a mixed-script work title. One Bangumi case reads multiple lines from the site's existing Chinese summary and Japanese original, then checks font order and text restoration while mixed mode is toggled. It does not insert a test sentence into the live page. Live-site failures can be caused by changed markup, redirects, access restrictions, or network conditions; inspect the loaded page before rewriting detection logic. For new live-site cases, select reading content from the site's own structure or text, not from extension-generated `data-*` attributes, and check multiple relevant passages when the behavior concerns a whole reading area. Keep real-page assertions about font order or computed style when a bug concerns rendering.
+## Choose the browser
 
-`tests/sites/local-spa.spec.ts` intercepts synthetic pages without contacting an external site. It checks that mixed-language wrappers are removed when an SPA changes to English-only content, that one confirmed preceding segment can resolve a short neighboring segment without chaining guesses or crossing explicit `lang`/container boundaries, and that changing or removing that predecessor updates the dependent font. It also checks that a trusted root CJK `lang` prevents font changes even for nested and new content, that `body lang="en"` and bare root `lang="zh"` do not block Chinese font repair, and that bare descendant `lang="zh"` cannot introduce a second injected font when mixed detection is off. In-document Back and later website CSS changes have separate checks. `tests/action-icon.test.ts` drives the background entry through mocked Chrome events to check that an active page repaints its icon after navigation, a no-intervention report closes it immediately, and navigation creates no timer.
-
-Local SPA cases also check newly inserted and nested open shadow roots, removal/reinsertion, observed text updates, and restoration of a website's edited inline font. A settings-notification case verifies that unrelated and masked domain rules cause no font attachment writes, while removing a hostname exception, changing the effective domain rule, and combined global-font changes still take effect. `tests/managed-styles.test.ts` checks timer usage and the lifetime of inline self-write suppression through the managed-style interface.
-
-A changed-region case removes CJK text in both light and nested shadow trees, checking that obsolete fallbacks are restored while an outside region keeps its font. It also checks that a document-wide website font change still updates managed descendants.
-
-The cached-channel history case starts from a freshly loaded English Home state with Japanese content retained in an inactive region. After Back and an observable loading change, it lets the old-region scan complete before restoring the channel's `role=main`; the Latin title and existing text cannot wake the old dormant path by themselves. It checks that Japanese detection and computed fallback recover. The page-language unit cases distinguish a real primary-region switch from unrelated or redundant roles and manual/trusted language choices.
-
-`tests/sites/options-layout.spec.ts` loads the actual Settings page and checks its borderless font rows across four viewport widths: language headings and Sans/Serif fields reflow without horizontal overflow, both font labels share a color, and the default Chinese explanation is not constrained to the menu width. It also checks action placement across themes, dark secondary-button contrast, disabled hover, keyboard focus, paired theme-color changes, and the popup's full-width Settings action.
-
-`tests/sites/options-loading.spec.ts` checks font-list errors and empty lists without losing saved font choices or blocking independent settings and site actions. It separates missing recommended defaults, saved-settings read failures, and repair-write failures.
-
-`tests/sites/site-settings.spec.ts` checks the actual popup and Settings flows: toolbar creation, inline edits triggered only by the pencil, cancellation, duplicate and destination conflicts, both directions of hostname/domain moves, concurrent edits, preserved site rules on Restore defaults, one-click row deletion, and active/inactive popup details. Creation checks cover retaining search in an empty manager, restoring the query on Cancel, draft retention through Hide and storage updates, failure/retry, single-line desktop controls, readable scope options, and overflow across themes and narrow widths. Row checks cover matching Edit/Cancel transitions and reduced motion, cancel-button border contrast and hover/keyboard focus, draft retention across search, Hide, and another window's updates, and retrying a failed save. Its 100-rule fixture checks global search and ten-rule pages within a language group. Separate checks cover Manage/Hide, local Delete/Undo fade and height transitions, reduced motion, and closing the manager during deletion.
-
-Targeted list-update cases verify that adding or deleting a Japanese rule keeps a Chinese group's nodes and unfinished draft mounted. They sample deletion frames to distinguish row/group height collapse from a whole-list fade, retain the next row's focused input and caret, and check that two rapid delete clicks both complete.
-
-Site-rule cases also check that returning a popup choice to default Auto removes the saved hostname record, that old automatic defaults do not appear in the manager, and that adding or removing a domain rule does not give those old defaults a new effect. The background-event unit test checks cleanup during an extension update alongside a concurrent popup edit.
-
-## Independently labeled language corpus
-
-The opt-in `tests/sites/flores-corpus.spec.ts` uses the official [FLORES-200](https://github.com/facebookresearch/flores/blob/main/flores200/README.md) `devtest` files for `zho_Hans`, `zho_Hant`, and `jpn_Jpan`. Its 120 cases are 40 non-overlapping groups per variant, alternating one, three, and ten distinct sentences per page. Half of the pages have no `lang`; half declare `en-US`. Playwright serves each group as a local page, loads the built extension, and lets Chromium actually run `chrome.i18n.detectLanguage()`. The expected region comes from the dataset label, not a stubbed detector or the extension's own output. No external website receives these page loads.
-
-Obtain the original archive from [Meta's FLORES-200 download link](https://dl.fbaipublicfiles.com/nllb/flores200_dataset.tar.gz) and extract it to `.local-test-data/flores200_dataset`. You can instead keep it elsewhere and set `CJ_FLORES_DIR` to that directory. The browser test does not download or redistribute the text. FLORES-200 is [CC BY-SA 4.0](https://huggingface.co/datasets/facebook/flores); keep the archive's source and license information with any local copy. `npm run test:sites` excludes these opt-in cases, and `test:corpus` requires the directory explicitly. See [language test data research](language-test-data-research.md) for the source and release decision.
-
-These are long, translated, single-language samples presented in a controlled DOM. A passing score does **not** establish short-title or mixed-page accuracy, nor does it verify real-site DOM sampling or rendered fonts. Keep the live-site cases and inspect their computed and rendered fonts separately. Corpus failures should be reported by source label and case number rather than edited away to preserve a passing score.
-
-## Choosing a browser
-
-Start with Playwright's bundled Chromium, headless, in its temporary profile. Use it for local SPA fixtures, the corpus, UI layout checks, and real sites that load normally. Run only the relevant site case while debugging; `npm run test:sites` is the broader regression suite, not the first command for one URL. After `npm run build`, a focused run looks like:
+Start with Playwright's bundled Chromium, headless, in a temporary profile. Use a focused case while debugging; the full site suite is a regression gate. After `npm run build`:
 
 ```sh
 ./node_modules/.bin/playwright test --config playwright.sites.config.ts tests/sites/local-spa.spec.ts --grep 'directly preceding strong segment' --retries=0
 ./node_modules/.bin/playwright test --config playwright.sites.config.ts tests/sites/real-sites.spec.ts --grep 'detects Bangumi' --retries=0
 ```
 
-Use the installed Flatpak Chromium **only when its browser version, installed fonts, or packaging could change the result**, or when a site requires a visible window for human verification. For an automated compatibility comparison, keep the test headless and change only the executable: set `CJ_TEST_CHROMIUM_EXECUTABLE=./scripts/flatpak-chromium.sh` on the same focused command. Use `CJ_TEST_HEADLESS=0` only for a visual/browser-interaction question or a site that will not present its real content unattended. First run `npm run test:flatpak:headed:smoke` if a visible Flatpak automation session has not been checked in the current environment. Flatpak uses the existing wrapper for `org.chromium.Chromium`; do not rediscover the app ID or construct a new launch command each time. `npm run test:sites:flatpak` and `npm run test:sites:flatpak:headed` run the **entire** site suite and are for deliberate compatibility/regression passes, not routine single-site debugging.
+Use Flatpak Chromium when its version, installed fonts, or packaging could affect the result. Change only the executable for a headless comparison:
 
-If the default browser fails to start because of sandbox permissions, retry the **same browser command** in an environment allowed to launch it; that failure is not a reason to switch to Flatpak or to headed mode. If a real site fails to load, first distinguish a network/redirect error from a human-verification page. Do not repeatedly reload or switch browsers automatically; verify that the intended page was actually shown before interpreting its language result.
+```sh
+CJ_TEST_CHROMIUM_EXECUTABLE=./scripts/flatpak-chromium.sh ./node_modules/.bin/playwright test --config playwright.sites.config.ts tests/sites/local-spa.spec.ts --grep 'does not trust an English body lang for Chinese content' --retries=0
+```
 
-All automated Flatpak commands create a fresh temporary browser profile. A **visible** window is not the user's already-open Chromium window: it has none of that window's cookies, extensions, login state, or completed human-verification challenges, and the test closes it afterward. An ordinary Chromium window cannot be attached to retroactively unless it was launched with an appropriate debugging endpoint. If an issue depends on the user's existing session, inspect it in that session with the already-installed extension and user-guided DevTools observations; do not claim a fresh automated profile reproduces the same state. Do not launch automation against the user's everyday profile, as Chromium profile locking and test cleanup could disturb it.
+Use `CJ_TEST_HEADLESS=0` for a visual question or a page needing human verification. First run `npm run test:flatpak:headed:smoke` if visible Flatpak automation has not been checked in the current environment. The wrapper owns the app ID and launch setup; use it directly. The Flatpak full-suite commands are for deliberate regression passes.
 
-If a site shows a human-verification page in unattended tests, do not interpret the challenge page as a successful language result or change the classifier to fit it. Use `npm run inspect:flatpak -- '<exact URL>'` when visible Flatpak Chromium can resolve the challenge. The command opens a visible window with the current build and pauses after initial navigation. Complete the site's verification there, check that the intended page—not the challenge—is displayed, then press **Resume** in Playwright Inspector. The command prints the final URL and extension status; these are observations, not an automatic pass/fail verdict. Inspect the actual element and DevTools **Rendered Fonts** separately when the issue concerns the physical font. This manual workflow uses a fresh temporary profile, so its verification cookies are discarded when the window closes. It initiates only the supplied navigation; redirects and page resources may make other requests.
+If sandbox permissions prevent launch, retry the same command in an environment allowed to run the browser. `Unable to allocate instance id` is a Flatpak session/permission failure, not evidence of a wrong app ID. A launch failure alone does not justify switching browser or enabling a visible window.
 
-The smoke command was verified with a visible Flatpak Chromium window and passed its local font-correction assertion. In a restricted command sandbox, the same command can fail before Chromium starts with `Unable to allocate instance id`; that is a Flatpak session/permission failure, not evidence of a wrong app ID or a failed extension test. Re-run the **same command** in an environment allowed to start Flatpak rather than probing IDs or changing launch arguments. The command does not need network access for its test page.
+All automation uses fresh temporary profiles. A visible Flatpak window has none of the user's ordinary window's cookies, extensions, login, or completed verification, and closes after the test. For issues requiring that existing session, use the installed extension and user-guided DevTools observations. Keep automation off the everyday profile to avoid profile locking and cleanup conflicts. Attaching to an existing window requires that it was launched with an appropriate debugging endpoint.
 
-Playwright does not guarantee compatibility with a browser version other than its bundled one. The Flatpak run is an additional compatibility check, not a replacement for the default suite. Record the actual executable/version and profile when reporting results. Do not compare performance numbers across different browser versions or environments as if they were controlled samples.
+### Live-site loading and manual inspection
+
+Check the final loaded page before interpreting a failure. Redirects, network errors, changed markup, or verification challenges can prevent the intended content from appearing. Avoid repeated automated reloads or browser switches until the cause is understood. A challenge page is not a successful language test, and detection must not be changed to classify it as the requested page.
+
+For human verification, run `npm run inspect:flatpak -- '<exact URL>'` after building. It opens that URL in a fresh visible profile and pauses:
+
+1. Complete the site's verification and confirm that the intended page is displayed.
+2. Inspect the affected text and **Rendered Fonts** when relevant.
+3. Press **Resume** in Playwright Inspector to print the final URL and extension status.
+
+The output is an observation, not an automatic verdict. Verification cookies are discarded with the temporary profile. Redirects and page resources may make additional requests.
+
+Playwright's bundled browser is the default evidence; Flatpak is an additional compatibility check. Record executable/version and profile conditions. Compare performance only under matched environments.
 
 ## Reproducing a font or icon issue
 
@@ -76,8 +68,36 @@ Playwright does not guarantee compatibility with a browser version other than it
 
 ## Performance checks
 
-Use the same browser executable, version, profile conditions, viewport, page URL, font settings, and cache policy for extension-off and extension-on runs. Repeat runs and compare a distribution such as medians, not one load. Record at least the page's DOM size, managed-element count, load-to-stable interval, main-thread scripting/task time, and idle activity after the page has settled. For a large dynamic page such as `https://touhou.vote/v11/characterDetail`, distinguish the initial SPA insertion burst from steady-state mutation cost. If a profile shows long tasks, attribute them before changing batching; a browser-wide long task is not automatically caused by the content script.
+Match browser/version, profile, viewport, URL, font settings, and cache policy for extension-off/on comparisons. Repeat runs and compare distributions or medians. Record DOM size, managed-element count, load-to-stable time, scripting/task time, and settled-page idle activity. On large dynamic pages such as Touhou Vote, separate initial insertion bursts from steady-state mutations and attribute long tasks before changing batching.
 
-When performance code changes, verify that SC/TC/JP results, CSS rule reuse, icon state, and restoration remain unchanged on representative real sites. The old one-off Touhou benchmark numbers are not a permanent performance baseline: they came from a particular browser build, page state, and test interval.
+For performance changes, verify SC/TC/JP results, CSS rule reuse, icon state, and restoration on representative pages.
 
-For the 0.8.38 font-plan cache, a diagnostic build loaded the live Touhou Vote character-results page in isolated Flatpak Chromium 154 profiles, then opened and closed 50 result rows five times without reloading. Each expansion produced about 450 font candidates and increased managed elements from 1,113 to 1,513. The median time inside font-rule calculation was about 9.1 ms before the change and 1.3 ms after it. These runs used separate profiles and measure one instrumented processing stage, not total page-load or interaction time; do not treat the difference as a general speedup percentage. The unit suite, existing DuckDuckGo/Wikipedia/Bangumi browser cases, and the local SPA test for a website changing its CSS after load passed. Temporary instrumentation was removed after the comparison.
+### Historical measurement
+
+A 0.8.38 diagnostic comparison used isolated Flatpak Chromium 154 profiles on Touhou Vote's character-results page, opening and closing 50 rows five times. Expansions added about 450 candidates and raised managed elements from 1,113 to 1,513. Median font-plan calculation was about 9.1 ms before caching and 1.3 ms afterward. This measured one instrumented stage in separate profiles, not total interaction time or a permanent baseline. Unit, live-site, and later website-CSS-change checks passed; temporary instrumentation was removed.
+
+## Coverage index
+
+Use the test source for individual assertions and case names.
+
+| Test file or group | Main coverage |
+| --- | --- |
+| `tests/*.test.ts` | Deterministic language evidence, font ordering/support, update queues, declarations, settings, and managed-style write suppression |
+| `tests/action-icon.test.ts` | Toolbar navigation state, timer-free icon behavior, and update-time cleanup concurrent with a rule edit |
+| `tests/page-language.test.ts` | Sampling and actual versus unrelated primary-region changes |
+| `tests/sites/real-sites.spec.ts` | DuckDuckGo, Japanese/SC/TC Wikipedia, Bangumi, and a Japanese YouTube channel; computed fonts and mixed-text restoration |
+| `tests/sites/local-spa.spec.ts` | Local intercepted pages: stable language, mixed context and cleanup, trusted declarations, history/cached views, website CSS changes, shadow trees, and effective-rule updates |
+| `tests/sites/options-layout.spec.ts` | Responsive font controls, overflow, themes, button contrast, focus, and popup action layout |
+| `tests/sites/options-loading.spec.ts` | Font-list failure/empty lists, preserved choices, independent controls, stored-settings errors, and repair-write failures |
+| `tests/sites/site-settings.spec.ts` | Actual popup/Settings flow, inline drafts, scope/conflict/concurrency rules, search/pagination, deletion/Undo, animations, and unchanged groups retaining DOM and focus |
+| `tests/sites/flores-corpus.spec.ts` | Optional labeled single-language evaluation described below |
+
+Live-site rendering checks should select the website's own reading structure or text, not extension-generated markers. Check multiple passages for whole-area behavior and preserve computed-font/order assertions. Keep test content local and original for synthetic fixtures; current local SPA cases intercept requests without contacting external sites. The Bangumi checks read its existing content rather than insert test sentences into the live page.
+
+## Independently labeled language corpus
+
+The opt-in `tests/sites/flores-corpus.spec.ts` uses the official [FLORES-200](https://github.com/facebookresearch/flores/blob/main/flores200/README.md) `devtest` files for `zho_Hans`, `zho_Hant`, and `jpn_Jpan`. Its 120 cases are 40 non-overlapping groups per variant, alternating one, three, and ten distinct sentences per page. Half of the pages have no `lang`; half declare `en-US`. Playwright serves each group as a local page, loads the built extension, and lets Chromium actually run `chrome.i18n.detectLanguage()`. The expected region comes from the dataset label, not a stubbed detector or the extension's own output. No external website receives these page loads.
+
+Obtain the original archive from [Meta's FLORES-200 download link](https://dl.fbaipublicfiles.com/nllb/flores200_dataset.tar.gz) and extract it to `.local-test-data/flores200_dataset`. You can instead keep it elsewhere and set `CJ_FLORES_DIR` to that directory. The browser test does not download or redistribute the text. FLORES-200 is [CC BY-SA 4.0](https://huggingface.co/datasets/facebook/flores); keep the archive's source and license information with any local copy. `npm run test:sites` excludes these opt-in cases, and `test:corpus` requires the directory explicitly. See [language test data research](language-test-data-research.md) for the source and release decision.
+
+These are long, translated, single-language samples presented in a controlled DOM. A passing score does **not** establish short-title or mixed-page accuracy, nor does it verify real-site DOM sampling or rendered fonts. Keep the live-site cases and inspect their computed and rendered fonts separately. Corpus failures should be reported by source label and case number rather than edited away to preserve a passing score.

@@ -1,6 +1,6 @@
 # Code map
 
-Use this index to locate an implementation owner. Read [architecture](architecture.md) for the full runtime flow and [design decisions](decisions.md) before changing policy.
+Use this index to locate an implementation owner. Read [architecture](architecture.md) for the overview, [runtime details](runtime-details.md) for scheduling and state, and [design decisions](decisions.md) before changing policy.
 
 ## Runtime orchestration
 
@@ -38,6 +38,7 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 | Find elements that directly own CJK text | `src/page/candidate-scan.ts` | `collectCandidateElements()`, `addCandidate()` |
 | Detect CJK in a changed subtree | `src/page/candidate-scan.ts` | `subtreeContainsCjk()` |
 | Cross open shadow-root boundaries | `src/page/candidate-scan.ts` | `composedParentElement()`, `closestComposed()`, `isInShadowTree()` |
+| Select configured fonts and calculate per-run font plans | `src/fallback/controller.ts` | `createStyleActions()`, `fontForVariant()` |
 | Parse and normalize CSS font-family lists | `src/fonts/font-family.ts` | `parseFamilies()`, `normalizeFamily()` |
 | Recognize SC, TC, JP, Fangsong, and generic families | `src/fonts/font-family.ts` | `regionalVariantForFamily()`, `isFangsongFamily()`, `isGenericFamily()` |
 | Check whether the selected font is already in an effective position | `src/fonts/font-family.ts` | `hasEffectiveFallback()` |
@@ -49,15 +50,13 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 | Record, restore, and summarize managed elements | `src/fallback/managed-styles.ts` | `ManagedStyles.commit()`, `restore()`, `restoreAll()`, `summary()` |
 | Share generated CSS rules between identical stacks | `src/fallback/font-stack-rules.ts` | `FontStackRules.acquire()`, `release()`, `render()` |
 
-`FallbackController.createStyleActions()` joins font selection and application. It obtains the user's configured font through `fontForVariant()`, checks website-font preservation through `FontSupport`, checks existing order through `hasEffectiveFallback()`, and calls `composeFontFamily()` only when a change is required.
-
 ## Settings and UI
 
 | Behavior | Owner | Start at |
 | --- | --- | --- |
 | Default settings and storage migration | `src/settings/defaults.ts` | `DEFAULTS`, `settingsFromStorage()`, `preserveWebsiteFontsFromStorage()` |
 | Browser UI language to default Chinese variant | `src/settings/defaults.ts` | `defaultChineseForLanguage()` |
-| Installed font list and OS-dependent defaults | `src/settings/font-catalog.ts` | `getInstalledFonts()`, `defaultFor()`, `validChoice()` |
+| Installed font list and default font candidates | `src/settings/font-catalog.ts` | `getInstalledFonts()`, `defaultFor()`, `validChoice()` |
 | Validate and normalize site overrides | `src/settings/site-overrides.ts` | `getSiteOverride()`, `sanitizeSiteOverrides()`, `siteRulesFromStorage()`, `normalizeHostname()` |
 | Settings form, autosave, previews, and mixed-mode consent | `src/options/main.ts` | form initialization and event listeners |
 | Site-language manager | `src/options/site-language-settings.ts` | `setupSiteLanguageSettings()` |

@@ -1,6 +1,6 @@
 # Architecture
 
-This maps the code as it exists, not proposed features. Read [design decisions](decisions.md) before changing language or font policy, and [testing](testing.md) before interpreting a browser result. The README describes user-visible behavior.
+This maps the code as it exists, not proposed features. Read [design decisions](decisions.md) before changing language or font policy, and [testing](testing.md) before interpreting a browser result. The README describes user-visible behavior. Use [code map](code-map.md) to locate functions and [runtime details](runtime-details.md) for focused implementation reference.
 
 ## Find the owner
 
@@ -34,73 +34,106 @@ Browser-owned and protected pages may not run content scripts. Their popup shows
 
 ## Content-script flow
 
-```text
-DOM / settings / font event
-        ↓
-page/page-observer.ts       decide what became invalid
-        ↓
-page/update-queue.ts        merge full scans, subtree roots, and direct elements
-        ↓
-entries/content.ts          schedule and consume a run
-        ├─ page/page-language.ts       choose one stable page variant
-        ├─ fallback/simple-mode.ts     root-lang-only strategy
-        └─ fallback/controller.ts      advanced element strategy
-             ├─ page/candidate-scan.ts
-             ├─ page/element-language.ts
-             ├─ fallback/mixed-language.ts (opt-in)
-             └─ fonts/font-support.ts / font-family.ts
-        ↓
-fallback/managed-styles.ts  reversible element state
-        └─ fallback/font-stack-rules.ts  reference-counted shared CSS
-        ↓
-top-frame status and icon message
+Opening a page starts one content-script run. Relevant DOM, settings, and font changes enter the same flow with either a new language decision or the existing one.
+
+```mermaid
+flowchart TD
+    A["Page opens or a relevant change occurs"] --> B["Classify and queue work"]
+    B --> C["Run page processing"]
+    C --> D{"Recheck page language?"}
+    D -- Yes --> E["Resolve site choice and page language"]
+    D -- No --> F["Reuse current page result"]
+    E --> G{"Usable CJK variant?"}
+    F --> G
+    G -- No --> H["Restore extension changes or wait for relevant text"]
+    G -- Yes --> I{"Mode"}
+    I -- Simple --> J["Set the root lang temporarily"]
+    I -- Advanced --> K["Find CJK text owners in the scan scope"]
+    K --> L["Choose element treatment and font stack"]
+    L --> M["Apply reversible font changes"]
+    J --> N["Report actual intervention"]
+    M --> N
 ```
 
-`PageObserver` does not detect a language or write CSS. `UpdateQueue` does not read text. `FallbackController` receives coalesced work and owns the read-before-write style pipeline. `ManagedStyles` and `FontStackRules` own restoration and generated rules, so disabling or changing a decision does not leave stale injected CSS behind.
+The content entry coordinates the run. `PageObserver` interprets DOM changes; `UpdateQueue` merges full-page, subtree, and direct-element work. `PageLanguageDetector` supplies the page result, while `FallbackController` handles Advanced-mode elements. `ManagedStyles` restores old changes and shares generated CSS rules. Simple mode only sets the root `lang` and restores its original value later.
 
-### Page result and element result
+### How the page language is chosen
 
-`PageLanguageDetector` first checks a hostname override (`off`, SC, TC, or JP). With `trustCjkLang` enabled, a specific root CJK `lang` then decides the page without browser detection. `FallbackController` also skips all element scanning and font injection for that trusted root, including dynamically added content and nested `lang` declarations. Bare `zh` lacks a script, so SC/TC clues and the configured default Chinese variant decide it. Otherwise the detector samples the title plus up to 10,000 characters from `main`, `[role=main]`, a single `article`, the nearest shared container of the first two articles, or `body`, as applicable. The shared container prevents a first advertisement card from hiding later search results. It excludes code-like and non-prose elements, rejects pages without CJK, and keeps surrounding Latin text for `chrome.i18n.detectLanguage()`. It does not filter text by computed visibility or remove duplicate text from this sample. Kana and Chinese clues are fallbacks when the browser result is insufficient. When the browser ranks Chinese just above Japanese by at most ten percentage points, a conservative check can select JP if multiple distinct Japanese segments have sufficient kana and Japanese character evidence and the remaining segments lack strong Chinese evidence. This check does not override a trusted root declaration. A cached sample result avoids repeated asynchronous detection when the sample is unchanged.
+```mermaid
+flowchart TD
+    A["Page language is needed"] --> B{"Site has a language rule?"}
+    B -- Disabled --> X["No page language; restore intervention"]
+    B -- SC, TC, or JP --> Y["Use the selected language"]
+    B -- Auto --> C{"Trust a root CJK lang?"}
+    C -- Yes --> D["Use its language; resolve bare zh with Chinese clues"]
+    C -- No --> E["Sample the page's primary text"]
+    D --> Z["Page variant is ready"]
+    E --> F{"Sample has enough CJK evidence?"}
+    F -- No --> W["No result yet; wait for relevant text"]
+    F -- Yes --> G["Combine browser detection with Japanese and Chinese clues"]
+    G --> H{"Evidence selects SC, TC, or JP?"}
+    H -- Yes --> Z
+    H -- No --> W
+```
 
-On pages without a trusted specific root declaration, ordinary Advanced mode uses one page variant for every element needing extension CSS. With the trust setting on, `ElementLanguage` still leaves descendants whose `lang` explicitly identifies SC, TC, or JP to the browser unless the user forced a site override. English and other unsupported tags, as well as bare `zh`, do not skip CJK font repair; bare descendant `zh` does not select a separate font when mixed-language detection is inactive. Only after the opt-in mixed-page gate activates may an element use an explicit local variant or strong local evidence before the page variant. Mixed-language handling does not rewrite `lang` or change the page-level result. A manual site override takes precedence over automatic and declared results.
+The detector uses the same page result until navigation, settings, or a substantial sample change requires another decision. Sampling details and evidence limits are in [runtime details](runtime-details.md#language-sampling).
 
-### Candidates and CSS
+### Which elements receive font changes
 
-`candidate-scan.ts` collects elements that directly own CJK text nodes, plus input/textarea values or placeholders. It avoids styling large ancestors just because descendants contain CJK. Excluded elements include code, preformatted text, scripts, styles, SVG, and canvas. Advanced mode skips an element when no appropriate regional font is configured, when the chosen family is already in an effective position ahead of generic and conflicting regional families, or when the single website-font preference protects an acceptable reachable CJK family or declared font face. Declared Unicode subsets may be unloaded until needed; an errored face is not evidence that the website font can render CJK.
+```mermaid
+flowchart TD
+    A["Page variant is ready; Advanced mode is active"] --> B["Scan the page or changed subtree"]
+    B --> C{"Trusted root lang, with no manual override?"}
+    C -- Yes --> X["Leave the page to the browser"]
+    C -- No --> D["Find elements with direct CJK text"]
+    D --> E{"Trusted supported element lang, without forced override?"}
+    E -- Yes --> Y["Leave font selection to the browser"]
+    E -- No --> F{"Eligible mixed-language choice?"}
+    F -- Yes --> G["Use the element's supported local variant"]
+    F -- No --> H["Use the page variant"]
+    G --> I{"Does this element need correction?"}
+    H --> I
+    I -- No --> J["Leave the website stack or restore an obsolete change"]
+    I -- Yes --> K["Remove old attachment, read website stack, and compose fallback"]
+    K --> L["Write a reversible shared rule or inline fallback"]
+```
 
-For elements that do need intervention, the controller removes its old attachment, reads the website's computed `font-family` values in a batch, computes new stacks, then writes them in a batch. Explicit Latin families stay ahead of the selected CJK family. A recognized conflicting regional CJK family is moved behind the selected fallback; otherwise insertion is before the first generic family. No platform stack is hard-coded. Serif selection depends on the first generic family (`serif` or `ui-serif`); there is no separate Mono policy.
+Candidate scanning targets direct text owners, not every ancestor containing CJK somewhere below it. The controller batches style reads and writes; unsupported, already-correct, or protected website stacks remain unchanged. [Design decisions](decisions.md) records the font-preservation rules.
 
-Identical completed stacks share a generated CSS rule. The element stores a short `data-cjk-fallback-stack` identifier; `ManagedStyles` tracks the reversible state and `FontStackRules` reference-counts rules. Open shadow roots and elements with an inline `font-family: ... !important` receive a reversible inline fallback because the document rule cannot reliably style them. The managed-element count means attached CSS intervention, not proof that the selected font rendered every glyph.
+### What happens when a page changes
 
-Candidate scanning includes the entry host's own open shadow root as well as descendant hosts. Observer deduplication uses a weak collection; there is no separate strong registry of discovered roots. Only inline style writes need self-mutation suppression, and one timer clears the batch after mutation delivery. Shared-rule attribute writes are outside the observer's attribute filter.
+```mermaid
+flowchart TD
+    A["DOM, navigation, setting, or font change"] --> B{"Is a full-page scan needed?"}
+    B -- Yes --> C{"Does the page language need re-detection?"}
+    C -- Yes --> D["Queue a full scan and recheck the page language"]
+    C -- No --> E["Queue a full scan using the current page result"]
+    B -- No --> F["Queue the changed element or subtree"]
+    D --> G["Coalesce queued work"]
+    E --> G
+    F --> G
+    G --> H{"Small eligible CJK update queued by a click?"}
+    H -- Yes --> I["Run the existing local correction immediately"]
+    H -- No --> J["Run through the normal scheduler"]
+    I --> K["Scan the queued scope and apply needed changes"]
+    J --> K
+```
 
-For one changed subtree, `ManagedStyles.affected()` uses native containment in each light tree and follows shadow-root hosts as needed. It still checks the managed-element set; it does not walk an additional DOM subtree or maintain another index. Multiple changed roots retain the ancestor-set lookup, and full scans and direct-only updates retain their existing selection paths.
+Stable same-page additions reuse the existing page result and scan only queued scopes. Route changes, relevant language-sample changes, and settings can request a full recheck. Small CJK updates queued by a click may use the same local correction path immediately; other work uses the coalesced scheduler. If automatic detection finds no CJK, the observer waits for relevant text instead of repeatedly scanning ordinary page changes. With dynamic detection off, later DOM changes do not trigger rescans; removal cleanup still runs. Scheduling limits and invalidation rules are in [runtime details](runtime-details.md#startup-and-updates).
 
-### Updates and modes
-
-Initial detection starts early; it does not wait for all web fonts to load. In advanced mode, new DOM subtrees and changed direct text owners are normally rescanned locally. Once automatic detection has selected a page variant, ordinary mutations at the same URL keep that page result: an expanded comment or feed item is styled with the existing choice instead of reclassifying the whole page. Replacing the selected sample root, rewriting multiple existing sampled CJK text nodes as non-CJK, a History API URL change, root language change, settings change, stylesheet, or font metadata can still request broader work. `UpdateQueue` coalesces roots and elements at consumption time: a full scan subsumes all local work, and an ancestor subtree subsumes descendants. The page result is cached and is not recomputed for every feed item. Once a page is confirmed to have no CJK text, the observer uses a cheaper dormant path until relevant sampled CJK content appears.
-
-With dynamic detection enabled, a changed URL observed during SPA DOM work requests a full rescan and language re-detection. In-document browser Back/Forward (`popstate`) does the same even when a SPA restores existing nodes without changing their text. These requests enter the normal coalesced scheduler; they do not start polling or run detection synchronously inside the navigation event.
-
-A history scan can run before an SPA restores its primary content. The observer also watches `role` changes; `PageLanguageDetector.sampleRegionChanged()` invalidates sampling only if the selected primary region actually changes. This catches cached views whose old region stays connected after losing `role=main`, including the no-CJK path. Other roles cause no font work, and declared/manual choices keep no automatic sample to invalidate. The existing scheduler handles the new request without an additional navigation delay.
-
-If dynamic detection is disabled, the initial result is retained and only lightweight removal cleanup remains. Simple mode never applies element CSS: it temporarily sets the root `lang`, remembers the original value for restoration, and uses a short startup observer for client-rendered content. It stops once a variant is found or its two-second bootstrap window ends.
-
-### Experimental mixed-language path
-
-The mixed detector is off by default, advanced-mode-only, and ineligible when the page has a root CJK declaration or a manual site override. It reuses candidate scanning rather than making a second whole-body pass. Direct segments are capped at 500 characters each and about 10,000 CJK characters overall. It activates only when both page-language and opposing-language evidence have substantial text; separate segments can then choose their own fallback. After this gate, standalone segments made entirely of kana, or kana plus recognized Japanese character clues, may also choose JP despite being too short for the ordinary strong-evidence threshold. The clue set is a static, conservative heuristic derived from Japanese standard forms and a small kokuji seed, with common SC/TC exemplar characters excluded; see [the research note](japanese-character-clues-research.md). If a short segment remains uncertain, it may check one immediately preceding, independently classified direct-text segment in the same owner or a peer paragraph. The current segment still needs matching script clues; shared Han alone is not assigned a language from its neighbor. A different container, explicit CJK `lang`, or a large `<br>` gap stops this lookback, and a context-derived choice cannot propagate to another segment. Changed or removed predecessors cause their immediate dependents to be reconsidered. Short segments and contextual decisions never activate the mixed mode by themselves. Multiple direct text nodes, such as paragraphs separated by `<br>`, may receive reversible spans. A narrow Bangumi `h2.subtitle` rule can isolate a work title inside its fixed Chinese heading template. No generic whitespace-based inline splitting is performed, and no second `chrome.i18n.detectLanguage()` pass over residual text exists.
+The optional mixed-language path remains off by default and applies only to eligible Advanced-mode pages. It can choose a local variant for supported text segments after the page-level gate passes; it does not alter the page result. Its evidence and limits are documented in [runtime details](runtime-details.md#experimental-local-language-decisions) and [design decisions](decisions.md#experimental-mixed-language-detection).
 
 ## Settings and UI state
 
-Defaults and font choices live in `src/settings/`; the options page saves changes immediately. Site overrides are stored in separate exact-hostname and registered-domain maps, not by URL path, and are managed separately. The background worker resolves the registered domain using `publicSuffix` once per document and serializes rule edits across popup and Settings. `settings/site-overrides.ts` resolves exact hostname choices before domain choices. An exact hostname `Auto` choice explicitly bypasses an existing domain rule; without one, the default automatic choice leaves no record. `siteRulesFromStorage()` sanitizes both maps and removes redundant automatic choices for worker writes and manager rendering. Update-time cleanup shares the rule-save queue so it cannot overwrite a concurrent edit. Removing the entry restores inheritance; domain `Auto` deletes its rule. The main **Restore defaults** action does not delete site overrides. An unavailable page has no per-site controls in the popup because its content script cannot receive messages.
+Defaults and font choices live in `src/settings/`; general settings save on change, while site-rule forms require explicit submission. Site overrides are stored in separate exact-hostname and registered-domain maps, not by URL path, and are managed separately. The background worker resolves the registered domain using `publicSuffix` once per document and serializes rule edits across popup and Settings. `settings/site-overrides.ts` resolves exact hostname choices before domain choices. An exact hostname `Auto` choice explicitly bypasses an existing domain rule; without one, the default automatic choice leaves no record. `siteRulesFromStorage()` sanitizes both maps and removes redundant automatic choices for worker writes and manager rendering. Update-time cleanup shares the rule-save queue so it cannot overwrite a concurrent edit. Removing the entry restores inheritance; domain `Auto` deletes its rule. The main **Restore defaults** action does not delete site overrides. An unavailable page has no per-site controls in the popup because its content script cannot receive messages.
 
 Content scripts keep both rule maps current on storage notifications. A notification containing only rule maps schedules work only when the current document's effective choice changes; unrelated rules and domain choices masked by a hostname exception do not trigger rescans. Notifications that also change global settings still follow the normal settings-update lifecycle.
 
-The popup distinguishes the page result from actual intervention: a page may be detected as SC, TC, or JP while CSS is **Not needed**, or while no configured regional font can be applied. The icon opens only when CSS is attached (or Simple mode applies a root language), not merely because a CJK language was detected.
+The popup distinguishes the page result from actual intervention: a page may be detected as SC, TC, or JP without any attached font correction, including when no configured regional font can be applied. Intervention rows are hidden in this state. The icon opens only when CSS is attached (or Simple mode applies a root language), not merely because a CJK language was detected.
 
 The popup's header book uses the same actual-intervention condition. It defaults to closed and remains closed when the page status is unavailable.
 
-`options/site-language-settings.ts` owns the grouped manager, global search, ten-rule pages, toolbar creation, inline row editing and deletion, and the animated Manage/Hide control. Add replaces the search toolbar with an inline form; Cancel restores the previous search, and successful creation clears search to reveal the new rule. The toolbar remains present for an empty list. Clicking the pencil replaces only that row with its editor; the website name itself is not an edit action. Draft forms survive Hide and storage updates; row drafts also survive search and pagination. Storage notifications are deferred while row drafts are active so a concurrent update cannot replace an input. The worker moves a rule between the two storage maps in one write and rejects an existing destination; canceling an editor never writes its draft. Restore defaults remains separate from deleting site rules.
+`options/site-language-settings.ts` owns the grouped manager, global search, ten-rule pages, toolbar creation, inline row editing and deletion, and the animated Manage/Hide control. **Add website** replaces the search toolbar with an inline form; Cancel restores the previous search, and successful creation clears search to reveal the new rule. The toolbar remains present for an empty list. Clicking the pencil replaces only that row with its editor; the website name itself is not an edit action. Draft forms survive Hide and storage updates; row drafts also survive search and pagination. Storage notifications are deferred while row drafts are active so a concurrent update cannot replace an input. The worker moves a rule between the two storage maps in one write and rejects an existing destination; canceling an editor never writes its draft. The visible scope labels are **Exact match** and **Include subdomains**; the storage scopes remain `hostname` and `domain`. Restore defaults remains separate from deleting site rules.
 
 The renderer reconciles groups by language and rows by scope/hostname, leaving unchanged DOM nodes connected. Cached normal rows are limited to displayed pages; draft rows remain available until their editor closes, and removed rules are evicted. Individual deletion collapses only the removed row, or its group when the last matching rule disappears. Rapid delete clicks queue their writes and collapses so they do not interrupt each other or drop a click. Unrelated groups and focused drafts remain active throughout. Only Delete all and Undo animate the entire results region, after storage succeeds.
 

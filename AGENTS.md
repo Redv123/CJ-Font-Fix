@@ -2,7 +2,8 @@
 
 Read the project document that matches the work:
 
-- `docs/architecture.md` for module ownership and runtime flow.
+- `docs/architecture.md` for runtime entries, module responsibilities, and processing overview.
+- `docs/runtime-details.md` for startup, scheduling, language sampling, style restoration, settings synchronization, and state lifetime.
 - `docs/code-map.md` to locate the class or function that owns a specific behavior before searching the tree.
 - `docs/decisions.md` for established product constraints and tradeoffs.
 - `docs/testing.md` for test boundaries, real-browser checks, and Flatpak Chromium use.
