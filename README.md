@@ -39,6 +39,8 @@ The actual choice depends on installed fonts. Suitable Noto fonts take priority 
 
 The first three options are on by default. **Detect clearly separated Chinese and Japanese text blocks (experimental)** is off by default. It can use different fonts for separate Chinese and Japanese passages on automatically detected pages containing substantial amounts of both languages. A manual website choice keeps it off. It can misclassify short passages or affect page appearance; uncertain text keeps the page's language choice.
 
+On Linux, **Trust Linux fontconfig replacements for Windows Chinese and Japanese fonts** is also on by default. Most distributions already provide fontconfig substitution rules, so common Windows font declarations can use these rules even when the named fonts are not installed. This option requires **Keep Chinese and Japanese fonts chosen by websites**; fonts for the wrong language may still be corrected.
+
 For font ordering and detection algorithms, see the [architecture guide](docs/architecture.md).
 
 ## Website language settings
