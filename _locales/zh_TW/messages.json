@@ -56,6 +56,8 @@
   "trustCjkLangHelp": { "message": "當內容的 lang 為 zh-CN、zh-TW、zh-HK 或 ja 時，沿用瀏覽器為該語言選用的字型，不修改該內容的字型。" },
   "preserveWebsiteFonts": { "message": "保留網站指定的中文、日文字型" },
   "preserveWebsiteFontsHelp": { "message": "網站已透過 CSS 指定與內容語言對應的中文或日文字型時，不會把你選擇的字型插到它前面；地區不符的字型仍可能被修正。" },
+  "trustWindowsFonts": { "message": "信任 Linux fontconfig 的 Windows 中日文字型替代規則" },
+  "trustWindowsFontsHelp": { "message": "多數 Linux 發行版已透過 fontconfig 設定替代字型。開啟後，網頁指定微軟雅黑、細明體、Meiryo 等常見 Windows 字型時，即使未安裝，也交給這些規則處理。地區不符的字型仍可能被修正。" },
   "dynamicDetection": { "message": "監看動態頁面" },
   "dynamicDetectionHelp": { "message": "自動修正之後出現的文字；網頁在不重新載入時前往其他網址，也會重新判斷語言。" },
   "mixedLanguageDetection": { "message": "偵測明確分隔的中文與日文文字區塊（實驗性）" },

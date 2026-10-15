@@ -7,17 +7,19 @@ import { byId, errorMessage } from "../shared/dom";
 import { localizeDocument, message } from "../shared/i18n";
 import { DEFAULTS, FONT_SETTINGS, LEGACY_PRESERVE_KEYS, SETTINGS_STORAGE_KEYS, settingsFromStorage } from "../settings/defaults";
 import { setupSiteLanguageSettings } from "./site-language-settings";
+import { getPlatformOs } from "../shared/platform";
 import type { FontSettingKey } from "../settings/defaults";
 import type { InstalledFont, Settings } from "../shared/types";
 
 const fontKeys = Object.keys(FONT_SETTINGS) as FontSettingKey[];
 const checkKeys = [
-  "trustCjkLang", "preserveWebsiteFonts", "simpleMode", "dynamicDetection",
+  "trustCjkLang", "preserveWebsiteFonts", "trustWindowsFonts", "simpleMode", "dynamicDetection",
   "mixedLanguageDetection"
 ] as const;
 
 let installedFonts: InstalledFont[] = [];
 let settingsLoaded = false;
+let isLinux = false;
 let fontListError = "";
 // Serialize automatic saves so a slower earlier write cannot win last.
 let saveQueue: Promise<void> = Promise.resolve();
@@ -38,6 +40,8 @@ function collectValues(): Partial<Omit<Settings, "siteOverrides" | "siteDomainOv
     dynamicDetection: byId<HTMLInputElement>("dynamicDetection").checked,
     mixedLanguageDetection: byId<HTMLInputElement>("mixedLanguageDetection").checked
   };
+  if (isLinux) values.trustWindowsFonts = Boolean(values.preserveWebsiteFonts) &&
+    byId<HTMLInputElement>("trustWindowsFonts").checked;
   // An unavailable font menu must not overwrite a saved family with an empty value.
   if (installedFonts.length) {
     for (const key of fontKeys) values[key] = byId<HTMLSelectElement>(key).value;
@@ -136,6 +140,9 @@ function showModeSection(element: HTMLElement, visible: boolean, animate: boolea
 
 function updateModeControls(animate = false): void {
   const simple = byId<HTMLInputElement>("simpleMode").checked;
+  const windowsFonts = byId<HTMLInputElement>("trustWindowsFonts");
+  windowsFonts.disabled = !isLinux || !byId<HTMLInputElement>("preserveWebsiteFonts").checked;
+  if (windowsFonts.disabled) windowsFonts.checked = false;
   for (const key of fontKeys) {
     byId<HTMLSelectElement>(key).disabled = simple || !installedFonts.length;
   }
@@ -164,7 +171,10 @@ async function restore(): Promise<void> {
   reset.disabled = true;
   let stored: Record<string, unknown>;
   try {
-    stored = await chrome.storage.sync.get(SETTINGS_STORAGE_KEYS);
+    const [values, os] = await Promise.all([chrome.storage.sync.get(SETTINGS_STORAGE_KEYS), getPlatformOs()]);
+    stored = values;
+    isLinux = os === "linux";
+    byId("windowsFontsSetting").hidden = !isLinux;
   } catch (error) {
     showStatus(message("couldNotLoadSettings", errorMessage(error)), true);
     return;
@@ -213,6 +223,7 @@ for (const key of fontKeys) {
 }
 
 byId<HTMLInputElement>("simpleMode").addEventListener("change", () => updateModeControls(true));
+byId<HTMLInputElement>("preserveWebsiteFonts").addEventListener("change", () => updateModeControls());
 const mixedLanguageCheckbox = byId<HTMLInputElement>("mixedLanguageDetection");
 const mixedLanguageConsent = byId<HTMLDialogElement>("mixedLanguageConsent");
 mixedLanguageCheckbox.addEventListener("change", () => {

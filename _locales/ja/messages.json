@@ -56,6 +56,8 @@
   "trustCjkLangHelp": { "message": "内容の lang が zh-CN、zh-TW、zh-HK、ja の場合は、ブラウザーが選ぶフォントをそのまま使い、その内容のフォントを変更しません。" },
   "preserveWebsiteFonts": { "message": "サイトが指定した中国語・日本語フォントを維持する" },
   "preserveWebsiteFontsHelp": { "message": "サイトの CSS で内容の言語に合う中国語・日本語フォントが指定されている場合、選択したフォントをその前に挿入しません。地域が合わないフォントは引き続き修正されることがあります。" },
+  "trustWindowsFonts": { "message": "Windows の中国語・日本語フォントの代替を Linux の fontconfig に任せる" },
+  "trustWindowsFontsHelp": { "message": "多くの Linux ディストリビューションには fontconfig の代替フォント設定が用意されています。有効にすると、サイトが Microsoft YaHei、SimSun、Meiryo などの一般的な Windows フォントを指定した場合、未インストールでもその設定を使います。地域が合わないフォントは引き続き修正されることがあります。" },
   "dynamicDetection": { "message": "動的ページを監視する" },
   "dynamicDetectionHelp": { "message": "後から表示された文字のフォントを修正し、再読み込みを伴わないページ移動では言語を再判定します。" },
   "mixedLanguageDetection": { "message": "明確に分かれた中国語と日本語のテキストを検出する（試験的）" },

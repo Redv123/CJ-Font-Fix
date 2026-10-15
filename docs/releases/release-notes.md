@@ -13,6 +13,7 @@
 - Fixed font correction not starting when a page keeps its hidden loading placeholder beside newly loaded content.
 - Fixed brief font changes when hovering over YouTube descriptions or expanding new content on dynamic pages.
 - Improved website font preservation in browsers with fingerprinting protection.
+- Added a Linux-only option, enabled by default, to trust fontconfig replacements for common Windows Chinese and Japanese fonts.
 - Reduced unnecessary font processing and memory use on dynamic pages.
 
 ## Install

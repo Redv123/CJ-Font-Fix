@@ -115,3 +115,57 @@ test("shows one website-font switch and migrates both former values", async () =
     await page.close();
   }
 });
+
+for (const os of ["linux", "win", "mac"] as const) {
+  test(`shows Windows-font substitute trust only on Linux (${os})`, async () => {
+    const worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
+    await worker.evaluate(async () => {
+      await chrome.storage.sync.remove("trustWindowsFonts");
+      await chrome.storage.sync.set({ preserveWebsiteFonts: true, simpleMode: false, dynamicDetection: true });
+    });
+    const page = await context.newPage();
+    await page.addInitScript((platformOs) => {
+      if (!globalThis.chrome?.runtime) return;
+      Object.defineProperty(chrome.runtime, "getPlatformInfo", { configurable: true,
+        value: async () => ({ os: platformOs, arch: "x86-64", nacl_arch: "x86-64" }) });
+    }, os);
+    try {
+      await page.goto(await worker.evaluate(() => chrome.runtime.getURL("options.html")));
+      const checkbox = page.locator("#trustWindowsFonts");
+      await expect(page.locator("#preserveWebsiteFonts")).toBeEnabled();
+      if (os !== "linux") {
+        await expect(checkbox).toBeHidden();
+        await expect(checkbox).toBeDisabled();
+        await expect(checkbox).not.toBeChecked();
+        await page.locator("#dynamicDetection").uncheck();
+        await expect.poll(async () => worker.evaluate(async () =>
+          (await chrome.storage.sync.get("dynamicDetection")).dynamicDetection)).toBe(false);
+        expect(await worker.evaluate(() => chrome.storage.sync.get("trustWindowsFonts"))).toEqual({});
+        // A preference synced from Linux must not enable the control here.
+        await worker.evaluate(() => chrome.storage.sync.set({ trustWindowsFonts: true }));
+        await page.reload();
+        await expect(checkbox).toBeDisabled();
+        await expect(checkbox).not.toBeChecked();
+        return;
+      }
+      await expect(checkbox).toBeVisible();
+      await expect(checkbox).toBeChecked();
+      await page.locator("#preserveWebsiteFonts").uncheck();
+      await expect(checkbox).toBeDisabled();
+      await expect(checkbox).not.toBeChecked();
+      await expect.poll(async () => worker.evaluate(async () =>
+        (await chrome.storage.sync.get("trustWindowsFonts")).trustWindowsFonts)).toBe(false);
+      await page.reload();
+      await expect(checkbox).not.toBeChecked();
+      await expect(checkbox).toBeDisabled();
+      await page.locator("#preserveWebsiteFonts").check();
+      await expect(checkbox).toBeEnabled();
+      await expect(checkbox).not.toBeChecked();
+      await expect(page.locator("#resetSettings")).toBeEnabled();
+      await page.locator("#resetSettings").click();
+      await expect(checkbox).toBeChecked();
+      await expect.poll(async () => worker.evaluate(async () =>
+        (await chrome.storage.sync.get("trustWindowsFonts")).trustWindowsFonts)).toBe(true);
+    } finally { await page.close(); }
+  });
+}
