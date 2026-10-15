@@ -644,6 +644,79 @@ test("keeps the page language stable when a local comment is expanded", async ()
   }
 });
 
+test("ignores excluded attribute churn while retaining ancestor fonts and embedded stylesheet updates", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({ fontSC: "CJ Test Sans", fontSCSerif: "CJ Test Serif",
+      preserveWebsiteFonts: false, dynamicDetection: true, simpleMode: false,
+      siteOverrides: { "fixture.test": "sc" } });
+  });
+  const page = await context.newPage();
+  const cdp = await context.newCDPSession(page);
+  let executionContextId: number | undefined;
+  cdp.on("Runtime.executionContextCreated", ({ context: executionContext }) => {
+    if (executionContext.auxData?.type === "isolated" && !executionContext.name.includes("playwright")) {
+      executionContextId = executionContext.id;
+    }
+  });
+  await cdp.send("Runtime.enable");
+  try {
+    await page.route("https://fixture.test/excluded-attributes", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<html><head><style>
+        #region { font-family: sans-serif; } #region.serif { font-family: serif; }
+        </style></head><body><main>
+        <section id="region"><p id="prose">正常正文的中文字体</p></section>
+        <pre id="code"><code><span id="code-child">代码区域</span></code></pre>
+        <canvas id="canvas"></canvas><svg id="svg"><g id="svg-child"></g></svg>
+        <pre><style id="embedded" media="not all">#region { font-family: serif !important; }</style></pre>
+        </main></body></html>`
+    }));
+    await page.goto("https://fixture.test/excluded-attributes");
+    await page.bringToFront();
+    const family = () => page.locator("#prose").evaluate((element) => getComputedStyle(element).fontFamily);
+    await expect.poll(family).toContain("CJ Test Sans");
+    await page.waitForTimeout(350);
+    expect(executionContextId).toBeDefined();
+    // Every completed extension run reports its action state, including empty runs.
+    await cdp.send("Runtime.evaluate", { contextId: executionContextId, expression: `(() => {
+      globalThis.__cjkExcludedReports = 0;
+      const send = chrome.runtime.sendMessage;
+      chrome.runtime.sendMessage = function(...args) {
+        if (args[0]?.type === 'setActionState') globalThis.__cjkExcludedReports++;
+        return send.apply(this, args);
+      };
+    })()` });
+    await page.evaluate(async () => {
+      const targets = ["code", "code-child", "canvas", "svg", "svg-child"]
+        .map((id) => document.getElementById(id)!);
+      for (let frame = 0; frame < 20; frame++) {
+        for (const target of targets) {
+          target.setAttribute("class", `frame-${frame}`);
+          target.setAttribute("style", `opacity: ${frame % 2 ? 0.9 : 1}`);
+        }
+        await new Promise(requestAnimationFrame);
+      }
+    });
+    await page.waitForTimeout(350);
+    const reports = await cdp.send("Runtime.evaluate", { contextId: executionContextId,
+      expression: "globalThis.__cjkExcludedReports", returnByValue: true });
+    expect(reports.result.value).toBe(0);
+    expect(await family()).toContain("CJ Test Sans");
+
+    await page.locator("#region").evaluate((element) => { element.setAttribute("class", "serif"); });
+    await expect.poll(family).toContain("CJ Test Serif");
+    await page.locator("#region").evaluate((element) => { element.style.fontFamily = "sans-serif"; });
+    await expect.poll(family).toContain("CJ Test Sans");
+    // A style node still affects the document even when its parent is excluded.
+    await page.locator("#embedded").evaluate((element) => { (element as HTMLStyleElement).media = "all"; });
+    await expect.poll(family).toContain("CJ Test Serif");
+    const activeReports = await cdp.send("Runtime.evaluate", { contextId: executionContextId,
+      expression: "globalThis.__cjkExcludedReports", returnByValue: true });
+    expect(activeReports.result.value).toBeGreaterThan(0);
+  } finally { await cdp.detach(); await page.close(); }
+});
+
 test("updates one split-text element without disturbing other managed elements", async () => {
   await worker.evaluate(async () => {
     await chrome.storage.sync.clear();

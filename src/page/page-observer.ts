@@ -133,6 +133,7 @@ export class PageObserver {
       updates.requestFullScan();
       return true;
     }
+    if (mutation.target instanceof Element && closestComposed(mutation.target, EXCLUDED)) return false;
     if (["rel", "href", "media", "disabled"].includes(mutation.attributeName || "")) return false;
     if (mutation.target === document.documentElement) {
       updates.requestFullScan(mutation.attributeName === "lang");
