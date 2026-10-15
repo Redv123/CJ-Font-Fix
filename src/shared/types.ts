@@ -15,6 +15,7 @@ export interface Settings {
   defaultChinese: ChineseVariant;
   trustCjkLang: boolean;
   preserveWebsiteFonts: boolean;
+  trustWindowsFonts: boolean;
   simpleMode: boolean;
   dynamicDetection: boolean;
   mixedLanguageDetection: boolean;

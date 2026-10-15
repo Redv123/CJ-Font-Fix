@@ -20,6 +20,7 @@ export const DEFAULTS: Settings = {
   defaultChinese: defaultChineseForLanguage(browserLanguage),
   trustCjkLang: true,
   preserveWebsiteFonts: true,
+  trustWindowsFonts: true,
   simpleMode: false,
   dynamicDetection: true,
   mixedLanguageDetection: false,
@@ -37,12 +38,14 @@ export function preserveWebsiteFontsFromStorage(stored: Record<string, unknown>)
 }
 
 export function settingsFromStorage(stored: Record<string, unknown>): Settings {
+  const preserveWebsiteFonts = preserveWebsiteFontsFromStorage(stored);
   return {
     ...DEFAULTS,
     ...stored,
     siteOverrides: sanitizeSiteOverrides(stored.siteOverrides, true),
     siteDomainOverrides: sanitizeSiteOverrides(stored.siteDomainOverrides),
-    preserveWebsiteFonts: preserveWebsiteFontsFromStorage(stored)
+    preserveWebsiteFonts,
+    trustWindowsFonts: preserveWebsiteFonts && stored.trustWindowsFonts !== false
   };
 }
 

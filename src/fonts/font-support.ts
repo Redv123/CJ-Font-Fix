@@ -2,7 +2,8 @@ import {
   isGenericFamily,
   isFangsongFamily,
   normalizeFamily,
-  regionalVariantForFamily
+  regionalVariantForFamily,
+  windowsCjkVariantForFamily
 } from "./font-family";
 import { classifyUnicodeRange } from "./unicode-range";
 import type { InstalledFont, Settings, Variant } from "../shared/types";
@@ -20,6 +21,11 @@ export class FontSupport {
   private readonly installedFamilies = new Set<string>();
   private readonly customCjkFamilies = new Set<string>();
   private metadataDirty = true;
+  private platformOs: string | null = null;
+
+  setPlatform(os: string | null): void {
+    this.platformOs = os;
+  }
 
   setInstalledFonts(fonts: readonly InstalledFont[]): void {
     this.installedFamilies.clear();
@@ -76,10 +82,11 @@ export class FontSupport {
       return !desiredVariant || !variant || variant === desiredVariant;
     }
     const known = explicit.find((family) =>
-      this.installedFamilies.has(normalizeFamily(family).toLowerCase())
+      this.installedFamilies.has(normalizeFamily(family).toLowerCase()) ||
+      (this.platformOs === "linux" && settings.trustWindowsFonts && windowsCjkVariantForFamily(family) !== null)
     );
     if (!known) return false;
-    const variant = regionalVariantForFamily(known);
+    const variant = windowsCjkVariantForFamily(known) ?? regionalVariantForFamily(known);
     if (isFangsongFamily(known)) return desiredVariant !== "jp";
     return !desiredVariant || !variant || variant === desiredVariant;
   }

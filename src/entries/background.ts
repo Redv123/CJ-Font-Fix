@@ -137,6 +137,17 @@ async function editSiteRule(edit: SiteRuleEdit): Promise<void> {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "getPlatformInfo") {
+    void (async () => {
+      try {
+        sendResponse(await chrome.runtime.getPlatformInfo());
+      } catch (error) {
+        console.warn("CJ Font Fallback Fix could not read the browser platform:", error);
+        sendResponse(null);
+      }
+    })();
+    return true;
+  }
   if (message?.type === "getInstalledFonts") {
     void (async () => {
       try {

@@ -14,6 +14,7 @@ import { PageObserver } from "../page/page-observer";
 import { subtreeContainsCjk } from "../page/candidate-scan";
 import { UpdateQueue } from "../page/update-queue";
 import { DEFAULTS, SETTINGS_STORAGE_KEYS, settingsFromStorage } from "../settings/defaults";
+import { getPlatformOs } from "../shared/platform";
 import type { ActionStateMessage, ContentMessage, InstalledFont, Settings } from "../shared/types";
 
 /**
@@ -206,7 +207,10 @@ function startContentApplication(): void {
     if (installedFontsLoaded) return;
     installedFontsLoaded = true;
     try {
-      const fonts: InstalledFont[] = await chrome.runtime.sendMessage({ type: "getInstalledFonts" });
+      const [fonts, os]: [InstalledFont[], chrome.runtime.PlatformInfo["os"] | null] = await Promise.all([
+        chrome.runtime.sendMessage({ type: "getInstalledFonts" }), getPlatformOs()
+      ]);
+      fontSupport.setPlatform(os);
       fontSupport.setInstalledFonts(fonts);
     } catch (error) {
       // An unavailable catalog provides no evidence to skip configured fallback.

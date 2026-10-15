@@ -23,6 +23,27 @@ export function normalizeFamily(name: string): string {
   return name.trim().replace(/^["']|["']$/g, "").trim();
 }
 
+// Based on Windows CJK entries in Ubuntu 24.04 fontconfig 2.15.0's
+// 40/65-nonlatin.conf and Fedora 44 fontconfig 2.17.0's 40/69-nonlatin.conf.
+// Localized spellings identify the same families; this is not a fontconfig resolver.
+const WINDOWS_CJK_FAMILIES: Record<Variant, readonly string[]> = {
+  sc: ["Microsoft YaHei", "Microsoft YaHei UI", "微软雅黑", "微软雅黑 UI",
+    "SimSun", "NSimSun", "宋体", "新宋体"],
+  tc: ["Microsoft JhengHei", "Microsoft JhengHei UI", "微軟正黑體", "微軟正黑體 UI",
+    "MingLiU", "PMingLiU", "細明體", "新細明體"],
+  jp: ["MS Gothic", "MS Mincho", "ＭＳ ゴシック", "ＭＳ 明朝",
+    "Yu Gothic UI", "Meiryo", "メイリオ", "Meiryo UI", "MS UI Gothic", "ＭＳ ＵＩゴシック"]
+};
+const windowsFamilyKey = (name: string): string => normalizeFamily(name).normalize("NFKC").toLowerCase();
+const windowsCjkVariants = new Map<string, Variant>(
+  (Object.entries(WINDOWS_CJK_FAMILIES) as [Variant, readonly string[]][])
+    .flatMap(([variant, names]) => names.map((name) => [windowsFamilyKey(name), variant] as const))
+);
+
+export function windowsCjkVariantForFamily(family: string): Variant | null {
+  return windowsCjkVariants.get(windowsFamilyKey(family)) ?? null;
+}
+
 /** Split a computed CSS family list without splitting commas inside quotes. */
 export function parseFamilies(value: string): string[] {
   const parts: string[] = [];

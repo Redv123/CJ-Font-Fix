@@ -103,6 +103,62 @@ describe("regional CJK font names", () => {
   });
 });
 
+describe("Linux system replacements for Windows CJK fonts", () => {
+  it("trusts supported declarations without requiring an installed family", () => {
+    const support = new FontSupport();
+    support.setPlatform("linux");
+    for (const [variant, names] of [
+      ["sc", ["Microsoft YaHei", "微软雅黑", "SimSun", "NSimSun", "新宋体"]],
+      ["tc", ["Microsoft JhengHei UI", "微軟正黑體", "MingLiU", "新細明體"]],
+      ["jp", ["MS Gothic", "ＭＳ 明朝", "MS UI Gothic", "Meiryo", "メイリオ", "Meiryo UI", "Yu Gothic UI"]]
+    ] as const) {
+      for (const name of names) {
+        expect(support.shouldPreserve([name, "sans-serif"], DEFAULTS, variant), name).toBe(true);
+      }
+    }
+    expect(support.shouldPreserve([' "microsoft yahei" ', "sans-serif"], DEFAULTS, "sc")).toBe(true);
+  });
+
+  it("does not assume all Windows fonts or arbitrary names have configured substitutes", () => {
+    const support = new FontSupport();
+    support.setPlatform("linux");
+    for (const name of ["BIZ UDGothic", "DengXian", "KaiTi", "Missing CJK Font",
+      "Microsoft YaHei Missing", "Arial", "PingFang SC"]) {
+      expect(support.shouldPreserve([name, "sans-serif"], DEFAULTS, "sc"), name).toBe(false);
+    }
+  });
+
+  it("retains regional decisions and the first generic boundary", () => {
+    const support = new FontSupport();
+    support.setPlatform("linux");
+    expect(support.shouldPreserve(["微软雅黑", "sans-serif"], DEFAULTS, "jp")).toBe(false);
+    expect(support.shouldPreserve(["Microsoft YaHei", "sans-serif"], DEFAULTS, "tc")).toBe(false);
+    expect(support.shouldPreserve(["MS UI Gothic", "sans-serif"], DEFAULTS, "sc")).toBe(false);
+    expect(support.shouldPreserve(["sans-serif", "Microsoft YaHei"], DEFAULTS, "sc")).toBe(false);
+    expect(support.shouldPreserve(["Arial", "SimSun", "sans-serif"], DEFAULTS, "sc")).toBe(true);
+  });
+
+  it("honors both switches and never enables alias trust outside Linux", () => {
+    const support = new FontSupport();
+    for (const os of [null, "win", "mac", "cros"] as const) {
+      support.setPlatform(os);
+      expect(support.shouldPreserve(["Microsoft YaHei", "sans-serif"], DEFAULTS, "sc")).toBe(false);
+    }
+    support.setPlatform("linux");
+    expect(support.shouldPreserve(["Microsoft YaHei", "sans-serif"], {
+      ...DEFAULTS, trustWindowsFonts: false
+    }, "sc")).toBe(false);
+    expect(support.shouldPreserve(["Microsoft YaHei", "sans-serif"], {
+      ...DEFAULTS, preserveWebsiteFonts: false
+    }, "sc")).toBe(false);
+    // Disabling the exception does not stop ordinary installed-font preservation.
+    support.setInstalledFonts([{ fontId: "Microsoft YaHei", displayName: "Microsoft YaHei" }]);
+    expect(support.shouldPreserve(["Microsoft YaHei", "sans-serif"], {
+      ...DEFAULTS, trustWindowsFonts: false
+    }, "sc")).toBe(true);
+  });
+});
+
 describe("website-declared font faces", () => {
   it("preserves a declared CJK family with unloaded subsets, not failed faces", () => {
     vi.stubGlobal("document", {

@@ -104,7 +104,7 @@ test("keeps configured fallback working when the worker cannot read installed fo
       Object.defineProperty(chrome.fontSettings, "getFontList", { configurable: true, value: async () => {
         throw new Error("Simulated unavailable font catalog");
       } });
-      return chrome.storage.sync.set({ fontSC: "CJ Test Sans", preserveWebsiteFonts: true,
+      return chrome.storage.sync.set({ fontSC: "CJ Test Sans", preserveWebsiteFonts: true, trustWindowsFonts: false,
         simpleMode: false, siteOverrides: { "fixture.test": "sc" } });
     });
     await page.route("https://fixture.test/font-catalog-failure", (route) => route.fulfill({
@@ -168,6 +168,44 @@ test("loads the font catalog only when website-font preservation becomes necessa
     });
     await catalog.dispose();
   }
+});
+
+test("preserves Linux Windows-font substitutes and reapplies correction when trust is disabled", async () => {
+  await worker.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.sync.set({ fontSC: "CJ Test Sans", fontJP: "CJ Test Japanese",
+      preserveWebsiteFonts: true, simpleMode: false, dynamicDetection: true,
+      siteOverrides: { "fixture.test": "sc" } });
+  });
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/linux-font-substitutes", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<html><body><main>
+        <p id="yahei" style="font-family: 微软雅黑, Tahoma, Helvetica, SimSun, sans-serif">网站指定的微软雅黑</p>
+        <p id="missing" style="font-family: Missing CJK Font, sans-serif">未被系统规则列出的字体</p>
+        <p id="japanese" style="font-family: MS Gothic, sans-serif">中文内容使用了日文字体</p>
+        </main></body></html>`
+    }));
+    await page.goto("https://fixture.test/linux-font-substitutes");
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(2);
+    const family = (id: string) => page.locator(`#${id}`).evaluate((element) => getComputedStyle(element).fontFamily);
+    await expect(page.locator("#yahei")).not.toHaveAttribute("data-cjk-fallback-stack");
+    expect(await family("yahei")).not.toContain("CJ Test Sans");
+    expect(await family("missing")).toContain("CJ Test Sans");
+    expect(await family("japanese")).toContain("CJ Test Sans");
+    await worker.evaluate(() => chrome.storage.sync.set({ trustWindowsFonts: false }));
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(3);
+    expect(await family("yahei")).toContain("CJ Test Sans");
+    await worker.evaluate(() => chrome.storage.sync.set({ trustWindowsFonts: true }));
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(2);
+    await worker.evaluate(() => chrome.storage.sync.set({ siteOverrides: { "fixture.test": "jp" } }));
+    await expect.poll(async () => (await currentStatus()).pageVariant).toBe("jp");
+    await expect(page.locator("#japanese")).not.toHaveAttribute("data-cjk-fallback-stack");
+    expect(await family("japanese")).not.toContain("CJ Test Japanese");
+    expect(await family("yahei")).toContain("CJ Test Japanese");
+  } finally { await page.close(); }
 });
 
 for (const fixture of [

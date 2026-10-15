@@ -13,4 +13,17 @@ describe("website-font preference migration", () => {
     expect(settingsFromStorage({ preserveWebsiteFonts: false, preserveWebFonts: true })
       .preserveWebsiteFonts).toBe(false);
   });
+
+  it("defaults Windows-font trust to on without overwriting an explicit choice", () => {
+    expect(settingsFromStorage({}).trustWindowsFonts).toBe(true);
+    expect(settingsFromStorage({ trustWindowsFonts: false }).trustWindowsFonts).toBe(false);
+  });
+
+  it("turns Windows-font trust off when website-font preservation is disabled", () => {
+    expect(settingsFromStorage({ preserveWebsiteFonts: false }).trustWindowsFonts).toBe(false);
+    expect(settingsFromStorage({ preserveWebsiteFonts: false, trustWindowsFonts: true })
+      .trustWindowsFonts).toBe(false);
+    expect(settingsFromStorage({ preserveWebFonts: false, preserveKnownCjk: false, trustWindowsFonts: true })
+      .trustWindowsFonts).toBe(false);
+  });
 });
