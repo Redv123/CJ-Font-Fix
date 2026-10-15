@@ -2,6 +2,18 @@ import { closestComposed } from "./candidate-scan";
 import { isVariant, langToVariant } from "../language/tags";
 import type { Settings, Variant } from "../shared/types";
 
+/** Match textContent.slice(0, 3000) without reading the remaining descendants. */
+function classificationSample(owner: Element): string {
+  const walker = document.createTreeWalker(owner, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_CDATA_SECTION);
+  let sample = "";
+  while (sample.length < 3000) {
+    const node = walker.nextNode();
+    if (!node) break;
+    sample += (node.nodeValue || "").slice(0, 3000 - sample.length);
+  }
+  return sample;
+}
+
 /**
  * Resolves inherited element-level `lang` without changing the DOM.
  * Bare `zh` is classified separately because it carries no script information.
@@ -37,7 +49,7 @@ export class ElementLanguage {
     if (owner === document.documentElement) return this.pageVariant;
     const cached = this.classificationCache.get(owner);
     if (cached) return cached;
-    const variant = this.classifyChinese(owner.textContent?.slice(0, 3000) || "");
+    const variant = this.classifyChinese(classificationSample(owner));
     this.classificationCache.set(owner, variant);
     return variant;
   }

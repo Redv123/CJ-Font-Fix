@@ -46,7 +46,7 @@ The automatic cache key includes the root language, sample, default Chinese vari
 
 Language sampling and text-element discovery are separate operations. `candidate-scan.ts` walks the eligible body for a full scan, or queued regions for an incremental scan. It tests text nodes for Han/kana and collects their direct owning elements, including input/textarea values or placeholders. It skips code, preformatted text, scripts, styles, SVG, canvas, and other excluded elements. Scanning includes the entry host's own open shadow root and descendant hosts.
 
-`ElementLanguage` filters trusted descendant declarations before font reads. Ordinary mode uses the page variant; an active mixed-language decision can supply a local variant. The controller then:
+`ElementLanguage` filters trusted descendant declarations before font reads. Ordinary mode uses the page variant; an active mixed-language decision can supply a local variant. Bare descendant `zh` classification collects the first 3,000 UTF-16 code units in text order without reading the remaining descendants, and caches the result for that declaration owner within the run. The controller then:
 
 1. Removes prior extension attachments and obsolete parent styles so computed styles reflect the website.
 2. Reads computed `font-family` values in a batch.
