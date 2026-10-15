@@ -47,6 +47,8 @@ export class ManagedStyles {
   }
 
   inheritedFallbacksFor(element: HTMLElement, variant: Variant): string[] {
+    // Only another variant's managed fallback can affect this stack.
+    if (!this.elements.size || (this.variantCounts.size === 1 && this.variantCounts.has(variant))) return [];
     const fallbacks = new Set<string>();
     let current: Element | null = element.parentElement;
     while (current) {

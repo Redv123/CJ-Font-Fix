@@ -21,7 +21,50 @@ function apply(styles: ManagedStyles, target: HTMLElement, inlineFallback: boole
     originalInlineValue: "", originalInlinePriority: "" });
 }
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+describe("inherited fallback lookup", () => {
+  it("does not read ancestors when no different variant is managed", () => {
+    const styles = new ManagedStyles();
+    const target = element();
+    const readParent = vi.fn(() => null);
+    Object.defineProperty(target, "parentElement", { get: readParent });
+    expect(styles.inheritedFallbacksFor(target, "sc")).toEqual([]);
+    apply(styles, element(), false);
+    expect(styles.inheritedFallbacksFor(target, "sc")).toEqual([]);
+    styles.restoreAll();
+    expect(styles.inheritedFallbacksFor(target, "sc")).toEqual([]);
+    expect(readParent).not.toHaveBeenCalled();
+  });
+
+  it("retains other-variant ancestors and follows restored state without caching", () => {
+    class TestHTMLElement {}
+    vi.stubGlobal("HTMLElement", TestHTMLElement);
+    vi.stubGlobal("ShadowRoot", class {});
+    const ancestor = Object.assign(Object.setPrototypeOf(element(), TestHTMLElement.prototype), {
+      parentElement: null, getRootNode: () => ({})
+    }) as HTMLElement;
+    const middle = Object.assign(Object.setPrototypeOf(element(), TestHTMLElement.prototype), {
+      parentElement: ancestor
+    }) as HTMLElement;
+    const target = Object.assign(element(), { parentElement: middle });
+    const styles = new ManagedStyles();
+    const action = { element: ancestor, variant: "tc" as const, fallback: "Test TC",
+      appliedValue: '"Test TC", sans-serif', inlineFallback: false,
+      originalInlineValue: "", originalInlinePriority: "" };
+    styles.commit(action);
+    apply(styles, middle, false);
+    expect(styles.inheritedFallbacksFor(target, "sc")).toEqual(["Test TC"]);
+    expect(styles.inheritedFallbacksFor(target, "tc")).toEqual(["Test SC"]);
+    styles.restore(ancestor);
+    expect(styles.inheritedFallbacksFor(target, "sc")).toEqual([]);
+    styles.commit(action);
+    expect(styles.inheritedFallbacksFor(target, "sc")).toEqual(["Test TC"]);
+  });
+});
 
 describe("managed style self-write suppression", () => {
   it("does not schedule suppression for shared-rule attributes", () => {

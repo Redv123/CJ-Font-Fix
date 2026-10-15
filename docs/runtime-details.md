@@ -63,7 +63,7 @@ A renderer can replace corrected text with an empty text placeholder before rebu
 
 Identical completed stacks share a rule through `FontStackRules`. Ordinary elements receive a short `data-cjk-fallback-stack` identifier. Elements in open shadow trees and those with inline `font-family: ... !important` receive reversible inline fallback.
 
-Only inline style writes need self-mutation suppression. One timer clears the weak suppression batch after mutation delivery; shared-rule attributes are outside the observer's attribute filter. `ManagedStyles.affected()` checks native containment for one changed root, following shadow hosts where needed. Multiple roots use ancestor lookup; direct-only work and full scans have separate selection paths.
+Only inline style writes need self-mutation suppression. One timer clears the weak suppression batch after mutation delivery; shared-rule attributes are outside the observer's attribute filter. Inherited fallback lookup skips ancestor traversal when nothing is managed or every managed element uses the requested variant. `ManagedStyles.affected()` checks native containment for one changed root, following shadow hosts where needed. Multiple roots use ancestor lookup; direct-only work and full scans have separate selection paths.
 
 ### Experimental local language decisions
 
