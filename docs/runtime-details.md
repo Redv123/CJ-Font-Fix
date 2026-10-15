@@ -53,6 +53,8 @@ Language sampling and text-element discovery are separate operations. `candidate
 
 Font plans are cached by stack and variant for that run. They are reevaluated on later runs so website font changes remain observable. Explicit Latin and unclassified families retain precedence. Insertion is normally before the first generic family; recognized conflicting regional fonts can move behind the selected fallback. The first generic chooses Sans versus Serif. The detailed preservation rules belong in [design decisions](decisions.md#font-preservation-and-ordering).
 
+For named local fonts, `FontSupport` queries a case-insensitive set of installed font IDs and display names supplied by the worker through `getInstalledFonts`. The set retains only names eligible for website-font preservation: recognized CJK and Fangsong names. Each document loads this snapshot once, before its first Advanced run with a CJK variant and website-font preservation enabled; concurrent worker requests share an in-flight enumeration, and later requests enumerate again. The catalog stays out of synchronized settings. A failed read supplies no installed-font evidence, so it cannot suppress configured fallback. Website-declared CJK `@font-face` coverage remains separate and refreshes on font-loading events. Availability does not use Canvas measurements.
+
 A renderer can replace corrected text with an empty text placeholder before rebuilding the same content. During ordinary dynamic updates, removal cleanup temporarily keeps a single removed font owner's stack on the placeholder's parent. The queued scan reevaluates and removes this temporary attachment before reading descendant styles. Navigation, mixed-language mode, and removals with multiple font owners retain ordinary cleanup.
 
 Identical completed stacks share a rule through `FontStackRules`. Ordinary elements receive a short `data-cjk-fallback-stack` identifier. Elements in open shadow trees and those with inline `font-family: ... !important` receive reversible inline fallback.
@@ -73,6 +75,7 @@ After activation, qualifying short passages may use a local font or consult one 
 | Page result and automatic sample cache | Content entry / `PageLanguageDetector` | Current frame's content-script instance |
 | Pending regions and scan flags | `UpdateQueue` | Consumed by a run |
 | Managed elements and reversible styles | `ManagedStyles` | Until restored, removed, or the document is destroyed |
+| Installed font names | `FontSupport` | Current frame's content-script instance |
 | Shared CSS and reference counts | `FontStackRules` | While managed elements use the stack |
 | Original root language and startup observation | `SimpleMode` | Current application / bounded observation |
 | Search, pages, group visibility, drafts, and Undo snapshot | Site manager | Current Settings page |

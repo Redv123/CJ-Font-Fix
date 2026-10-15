@@ -51,7 +51,7 @@ Removing classified blocks and making another browser-language call on the remai
 - Preserve website Latin families and support stacks from all platforms. Runtime font composition must not assume a Linux-specific stack.
 - One website-font preference covers declared CJK faces and suitable installed families named by the website. Legacy preferences migrate to enabled if either was enabled, otherwise disabled.
 - Declared Unicode subsets may be respected before all subsets download; an errored face does not count as suitable coverage.
-- Preserve an available named Fangsong font for Chinese when preservation is enabled, including names with another Chinese regional suffix. For Japanese, put the Japanese fallback before Fangsong. Probe availability rather than assuming a portable family name: Windows and macOS use different names.
+- Preserve an available named Fangsong font for Chinese when preservation is enabled, including names with another Chinese regional suffix. For Japanese, put the Japanese fallback before Fangsong. Check installed font IDs and display names from the worker's system font list rather than assuming a portable name or measuring Canvas widths. A missing or unavailable list must not be treated as proof a font is installed.
 - Treat bare `emoji` as a named family. Keep early emoji families ahead of the inserted CJK fallback; those after the first generic do not affect insertion.
 
 ## Site language settings

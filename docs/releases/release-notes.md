@@ -11,6 +11,7 @@
 - Fixed cases where text added by a website kept the wrong font.
 - Fixed Japanese detection when returning to a YouTube channel after refreshing the homepage.
 - Fixed brief font changes when hovering over YouTube descriptions or expanding new content on dynamic pages.
+- Improved website font preservation in browsers with fingerprinting protection.
 - Reduced unnecessary font processing and memory use on dynamic pages.
 
 ## Install

@@ -2,11 +2,10 @@ import {
   isGenericFamily,
   isFangsongFamily,
   normalizeFamily,
-  quoteFamily,
   regionalVariantForFamily
 } from "./font-family";
 import { classifyUnicodeRange } from "./unicode-range";
-import type { Settings, Variant } from "../shared/types";
+import type { InstalledFont, Settings, Variant } from "../shared/types";
 
 const CJK_NAME_RE = /(?:cjk|source\s*han|思源|noto\s*(?:sans|serif)?\s*(?:sc|tc|jp|hk)|wenquanyi|文泉驿|hiragino|yu\s*(?:gothic|mincho)|meiryo|ms\s*(?:gothic|mincho)|pingfang|heiti|songti|kaiti|microsoft\s*(?:yahei|jhenghei)|dengxian|sim(?:sun|hei|kai)|mingliu|pmingliu|ipa(?:gothic|mincho)|takao|sarasa|更紗|霞鶩|lxgw)/i;
 
@@ -18,23 +17,21 @@ export { regionalVariantForFamily } from "./font-family";
  * this combines declared @font-face coverage, known CJK names, and availability.
  */
 export class FontSupport {
-  private readonly availableCache = new Map<string, boolean>();
+  private readonly installedFamilies = new Set<string>();
   private readonly customCjkFamilies = new Set<string>();
   private metadataDirty = true;
 
-  clearAvailability(): void {
-    this.availableCache.clear();
+  setInstalledFonts(fonts: readonly InstalledFont[]): void {
+    this.installedFamilies.clear();
+    for (const font of fonts) {
+      for (const name of [font.fontId, font.displayName]) {
+        const key = normalizeFamily(name).toLowerCase();
+        if (CJK_NAME_RE.test(key) || isFangsongFamily(key)) this.installedFamilies.add(key);
+      }
+    }
   }
 
   markMetadataDirty(): void {
-    this.metadataDirty = true;
-  }
-
-  noteLoadedFaces(faces: readonly FontFace[]): void {
-    for (const face of faces) {
-      const key = normalizeFamily(face.family || "").toLowerCase();
-      if (key) this.availableCache.delete(key);
-    }
     this.metadataDirty = true;
   }
 
@@ -79,31 +76,11 @@ export class FontSupport {
       return !desiredVariant || !variant || variant === desiredVariant;
     }
     const known = explicit.find((family) =>
-      (CJK_NAME_RE.test(family) || isFangsongFamily(family)) && this.appearsAvailable(family)
+      this.installedFamilies.has(normalizeFamily(family).toLowerCase())
     );
     if (!known) return false;
     const variant = regionalVariantForFamily(known);
     if (isFangsongFamily(known)) return desiredVariant !== "jp";
     return !desiredVariant || !variant || variant === desiredVariant;
-  }
-
-  // Canvas width comparison is an availability hint, not a rendered-font API:
-  // Chromium does not expose which physical face supplied an individual glyph.
-  private appearsAvailable(family: string): boolean {
-    const key = family.toLowerCase();
-    if (this.availableCache.has(key)) return this.availableCache.get(key) ?? false;
-    if (isGenericFamily(key)) return true;
-    const context = document.createElement("canvas").getContext("2d");
-    if (!context) return true;
-    const probe = "mmmmmmmmmmlli漢字かなWW";
-    const size = "72px";
-    const available = ["monospace", "serif", "sans-serif"].some((baseline) => {
-      context.font = `${size} ${baseline}`;
-      const baseWidth = context.measureText(probe).width;
-      context.font = `${size} ${quoteFamily(family)}, ${baseline}`;
-      return context.measureText(probe).width !== baseWidth;
-    });
-    this.availableCache.set(key, available);
-    return available;
   }
 }

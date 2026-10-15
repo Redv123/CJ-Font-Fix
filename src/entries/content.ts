@@ -14,7 +14,7 @@ import { PageObserver } from "../page/page-observer";
 import { subtreeContainsCjk } from "../page/candidate-scan";
 import { UpdateQueue } from "../page/update-queue";
 import { DEFAULTS, SETTINGS_STORAGE_KEYS, settingsFromStorage } from "../settings/defaults";
-import type { ActionStateMessage, ContentMessage, Settings } from "../shared/types";
+import type { ActionStateMessage, ContentMessage, InstalledFont, Settings } from "../shared/types";
 
 /**
  * Coordinates the content-script lifecycle.
@@ -38,6 +38,7 @@ function startContentApplication(): void {
   let applying = false;
   let rerunRequested = false;
   let fontRefreshTimer = 0;
+  let installedFontsLoaded = false;
   const languageDetector = new PageLanguageDetector();
   const simpleMode = new SimpleMode(() => {
     requestFullScan(true);
@@ -126,6 +127,9 @@ function startContentApplication(): void {
           );
         }
         if (oldVariant !== detection.variant) fullScan = true;
+        if (!settings.simpleMode && settings.preserveWebsiteFonts && detection.variant) {
+          await loadInstalledFonts();
+        }
         const result = applyFallbacks(fullScan, roots, elements);
         if (settings.simpleMode && detection.variant) simpleMode.stopBootstrap();
         if (oldVariant !== detection.variant) {
@@ -198,6 +202,18 @@ function startContentApplication(): void {
     settings.siteOverrides = settings.siteOverrides || {};
   }
 
+  async function loadInstalledFonts(): Promise<void> {
+    if (installedFontsLoaded) return;
+    installedFontsLoaded = true;
+    try {
+      const fonts: InstalledFont[] = await chrome.runtime.sendMessage({ type: "getInstalledFonts" });
+      fontSupport.setInstalledFonts(fonts);
+    } catch (error) {
+      // An unavailable catalog provides no evidence to skip configured fallback.
+      console.warn("CJ Font Fallback Fix could not read installed fonts:", error);
+    }
+  }
+
   chrome.runtime.onMessage.addListener((message: ContentMessage, _sender, sendResponse) => {
     // tabs.sendMessage without a frame ID can reach every injected frame. Only
     // the top frame should represent the page in the popup or own site overrides.
@@ -259,7 +275,6 @@ function startContentApplication(): void {
     // the newest domain choice, without rescanning unrelated pages now.
     if (changedKeys.every((key) => key === "siteOverrides" || key === "siteDomainOverrides") &&
         getSiteOverride(settings) === previousSiteChoice) return;
-    fontSupport.clearAvailability();
     pageObserver.configure();
     requestFullScan(true);
     await run();
@@ -285,12 +300,9 @@ function startContentApplication(): void {
         scheduleRun(0);
       }, { once: true });
     }
-    const fontsChanged = (event?: Event): void => {
+    const fontsChanged = (): void => {
       if (settings.simpleMode) return;
-      const fontfaces = event && "fontfaces" in event
-        ? (event as Event & { fontfaces: FontFace[] }).fontfaces
-        : [];
-      fontSupport.noteLoadedFaces(fontfaces);
+      fontSupport.markMetadataDirty();
       if (pageIsDormant()) return;
       if (fontRefreshTimer) clearTimeout(fontRefreshTimer);
       fontRefreshTimer = setTimeout(() => {

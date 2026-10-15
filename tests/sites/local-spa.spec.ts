@@ -41,6 +41,135 @@ test.afterAll(async () => {
   if (profileDirectory) await rm(profileDirectory, { recursive: true, force: true });
 });
 
+test("preserves website fonts using the worker catalog without reloading it during DOM updates", async () => {
+  const catalog = await worker.evaluateHandle(() => {
+    const state = { reads: 0, original: chrome.fontSettings.getFontList };
+    Object.defineProperty(chrome.fontSettings, "getFontList", { configurable: true, value: async () => {
+      state.reads++;
+      return [
+        { fontId: "NotoSansCJKCatalogFixture", displayName: "Noto Sans CJK SC CatalogFixture" },
+        { fontId: "Hiragino Sans CatalogFixture", displayName: "Hiragino Sans CatalogFixture" }
+      ];
+    } });
+    return state;
+  });
+  const page = await context.newPage();
+  try {
+    await worker.evaluate(() => chrome.storage.sync.set({ fontSC: "CJ Test Sans",
+      preserveWebsiteFonts: true, simpleMode: false, dynamicDetection: true,
+      mixedLanguageDetection: false, siteOverrides: { "fixture.test": "sc" } }));
+    await page.route("https://fixture.test/font-catalog", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<html><head><style>
+        #by-name { font-family: "noto sans cjk sc catalogfixture", sans-serif; }
+        #by-id { font-family: "NotoSansCJKCatalogFixture", sans-serif; }
+        #missing { font-family: "Noto Sans CJK SC Missing CatalogFixture", sans-serif; }
+        #wrong-region { font-family: "Hiragino Sans CatalogFixture", sans-serif; }
+        </style></head><body><main>
+        <p id="by-name">已安装字体的显示名称</p><p id="by-id">已安装字体的标识符</p>
+        <p id="missing">未安装的字体仍然需要修正</p><p id="wrong-region">不同地区的字体仍然需要修正</p>
+        </main></body></html>`
+    }));
+    await page.goto("https://fixture.test/font-catalog");
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(2);
+    await expect(page.locator("#by-name")).not.toHaveAttribute("data-cjk-fallback-stack");
+    await expect(page.locator("#by-id")).not.toHaveAttribute("data-cjk-fallback-stack");
+    for (const id of ["missing", "wrong-region"]) {
+      expect(await page.locator(`#${id}`).evaluate((element) => getComputedStyle(element).fontFamily))
+        .toContain("CJ Test Sans");
+    }
+    await page.evaluate(() => {
+      const paragraph = document.createElement("p");
+      paragraph.textContent = "动态插入的中文内容";
+      paragraph.style.fontFamily = '"Noto Sans CJK SC Missing CatalogFixture", sans-serif';
+      document.querySelector("main")!.append(paragraph);
+    });
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(3);
+    expect(await catalog.evaluate((state) => state.reads)).toBe(1);
+  } finally {
+    await page.close();
+    await catalog.evaluate((state) => {
+      Object.defineProperty(chrome.fontSettings, "getFontList", { value: state.original });
+    });
+    await catalog.dispose();
+  }
+});
+
+test("keeps configured fallback working when the worker cannot read installed fonts", async () => {
+  const original = await worker.evaluateHandle(() => chrome.fontSettings.getFontList);
+  const page = await context.newPage();
+  try {
+    await worker.evaluate(() => {
+      Object.defineProperty(chrome.fontSettings, "getFontList", { configurable: true, value: async () => {
+        throw new Error("Simulated unavailable font catalog");
+      } });
+      return chrome.storage.sync.set({ fontSC: "CJ Test Sans", preserveWebsiteFonts: true,
+        simpleMode: false, siteOverrides: { "fixture.test": "sc" } });
+    });
+    await page.route("https://fixture.test/font-catalog-failure", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: '<html><body><main><p style="font-family: Microsoft YaHei, sans-serif">读取字体列表失败后的中文内容</p></main></body></html>'
+    }));
+    await page.goto("https://fixture.test/font-catalog-failure");
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(1);
+    expect(await page.locator("p").evaluate((element) => getComputedStyle(element).fontFamily))
+      .toContain("CJ Test Sans");
+    expect(await worker.evaluate(() => chrome.storage.sync.get("fontSC"))).toEqual({ fontSC: "CJ Test Sans" });
+  } finally {
+    await page.close();
+    await worker.evaluate((getFontList) => {
+      Object.defineProperty(chrome.fontSettings, "getFontList", { value: getFontList });
+    }, original);
+    await original.dispose();
+  }
+});
+
+test("loads the font catalog only when website-font preservation becomes necessary", async () => {
+  const catalog = await worker.evaluateHandle(() => {
+    const state = { reads: 0, original: chrome.fontSettings.getFontList };
+    Object.defineProperty(chrome.fontSettings, "getFontList", { configurable: true, value: async () => {
+      state.reads++;
+      return [];
+    } });
+    return state;
+  });
+  const page = await context.newPage();
+  try {
+    await worker.evaluate(() => chrome.storage.sync.set({ fontSC: "CJ Test Sans",
+      preserveWebsiteFonts: true, simpleMode: false, dynamicDetection: true,
+      siteOverrides: {}, siteDomainOverrides: {} }));
+    await page.route("https://fixture.test/font-catalog-lazy", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: "<html lang=en><body><main><p>This page initially contains English text only.</p></main></body></html>"
+    }));
+    await page.goto("https://fixture.test/font-catalog-lazy");
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).reason).toBe("No CJK text");
+    expect(await catalog.evaluate((state) => state.reads)).toBe(0);
+    // Disabling preservation still allows new CJK content to be corrected without enumeration.
+    await worker.evaluate(() => chrome.storage.sync.set({ preserveWebsiteFonts: false,
+      siteOverrides: { "fixture.test": "sc" } }));
+    await page.evaluate((text) => {
+      const paragraph = document.createElement("p");
+      paragraph.textContent = text;
+      document.querySelector("main")!.append(paragraph);
+    }, CHINESE);
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(1);
+    expect(await catalog.evaluate((state) => state.reads)).toBe(0);
+    await worker.evaluate(() => chrome.storage.sync.set({ preserveWebsiteFonts: true }));
+    await expect.poll(() => catalog.evaluate((state) => state.reads)).toBe(1);
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(1);
+  } finally {
+    await page.close();
+    await catalog.evaluate((state) => {
+      Object.defineProperty(chrome.fontSettings, "getFontList", { value: state.original });
+    });
+    await catalog.dispose();
+  }
+});
+
 test("does not trust an English body lang for Chinese content", async () => {
   await worker.evaluate(async () => {
     await chrome.storage.sync.clear();

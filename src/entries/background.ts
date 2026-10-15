@@ -8,7 +8,7 @@ import { FONT_SETTINGS, LEGACY_PRESERVE_KEYS, preserveWebsiteFontsFromStorage } 
 import type { FontSettingKey } from "../settings/defaults";
 import { isSiteChoice, normalizeHostname, sanitizeSiteOverrides, siteRulesFromStorage } from "../settings/site-overrides";
 import type { SiteRuleEdit } from "../shared/types";
-import type { ActionStateMessage } from "../shared/types";
+import type { ActionStateMessage, InstalledFont } from "../shared/types";
 
 const ACTION_ICONS = {
   active: {
@@ -26,6 +26,13 @@ const ACTION_ICONS = {
 } as const;
 
 const tabStates = new Map<number, boolean>();
+let fontListRequest: Promise<InstalledFont[]> | null = null;
+
+/** Share concurrent enumerations, then let later documents see newly installed fonts. */
+function getRuntimeFonts(): Promise<InstalledFont[]> {
+  fontListRequest ??= getInstalledFonts().finally(() => { fontListRequest = null; });
+  return fontListRequest;
+}
 
 function isActionStateMessage(message: unknown): message is ActionStateMessage {
   if (!message || typeof message !== "object") return false;
@@ -75,7 +82,7 @@ chrome.runtime.onInstalled.addListener(async () => {
       }
       await chrome.storage.sync.remove([...LEGACY_PRESERVE_KEYS]);
     }
-    const fonts = await getInstalledFonts();
+    const fonts = await getRuntimeFonts();
     if (!fonts.length) return;
     const keys = Object.keys(FONT_SETTINGS) as FontSettingKey[];
     const stored = await chrome.storage.sync.get(keys);
@@ -130,6 +137,17 @@ async function editSiteRule(edit: SiteRuleEdit): Promise<void> {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "getInstalledFonts") {
+    void (async () => {
+      try {
+        sendResponse(await getRuntimeFonts());
+      } catch (error) {
+        console.warn("CJ Font Fallback Fix could not read installed fonts:", error);
+        sendResponse([]);
+      }
+    })();
+    return true;
+  }
   if (isActionStateMessage(message) && sender.tab?.id != null && (sender.frameId ?? 0) === 0) {
     void setActionState(sender.tab.id, message.inUse);
     return false;
