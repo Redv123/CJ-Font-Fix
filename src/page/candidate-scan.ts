@@ -46,10 +46,13 @@ export function hasDirectCjkText(element: Element): boolean {
     CJK_TEXT_RE.test(element.value || element.placeholder || "");
 }
 
+function canAddCandidate(candidates: Set<HTMLElement>, element: Element | null): element is HTMLElement {
+  return element instanceof HTMLElement && !candidates.has(element) && isInsideBody(element) &&
+    !element.matches(EXCLUDED) && !closestComposed(element, EXCLUDED);
+}
+
 export function addCandidate(candidates: Set<HTMLElement>, element: Element | null): void {
-  if (!(element instanceof HTMLElement) || candidates.has(element) || !isInsideBody(element) ||
-      element.matches(EXCLUDED) || closestComposed(element, EXCLUDED)) return;
-  if (hasDirectCjkText(element)) candidates.add(element);
+  if (canAddCandidate(candidates, element) && hasDirectCjkText(element)) candidates.add(element);
 }
 
 /**
@@ -85,7 +88,9 @@ export function collectCandidateElements(
   });
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     if (node.nodeType === Node.TEXT_NODE) {
-      addCandidate(candidates, node.parentElement);
+      // The walker already confirmed CJK in this owner's direct text.
+      const owner = node.parentElement;
+      if (canAddCandidate(candidates, owner)) candidates.add(owner);
       continue;
     }
     if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) addCandidate(candidates, node);
