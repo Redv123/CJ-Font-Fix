@@ -170,6 +170,145 @@ test("loads the font catalog only when website-font preservation becomes necessa
   }
 });
 
+for (const fixture of [
+  { language: "sc", text: CHINESE, placement: "portal", root: "main" },
+  { language: "tc", text: TRADITIONAL, placement: "main", root: "main" },
+  { language: "jp", text: JAPANESE, placement: "portal", root: "article" }
+]) {
+  test(`wakes after a hidden ${fixture.root} skeleton is replaced by ${fixture.language} content in a ${fixture.placement}`, async () => {
+    await worker.evaluate(() => chrome.storage.sync.set({ fontSC: "CJ Test Sans", fontTC: "CJ Test Traditional",
+      fontJP: "CJ Test Japanese", defaultChinese: "sc", preserveWebsiteFonts: false,
+      simpleMode: false, dynamicDetection: true, mixedLanguageDetection: false,
+      siteOverrides: {}, siteDomainOverrides: {} }));
+    const page = await context.newPage();
+    try {
+      const url = `https://fixture.test/skeleton-${fixture.language}`;
+      await page.route(url, (route) => route.fulfill({ contentType: "text/html; charset=utf-8",
+        body: `<html lang=en><head><title>Loading view</title></head><body>
+          <${fixture.root} id=skeleton>Loading...</${fixture.root}><div id=portal></div></body></html>` }));
+      await page.goto(url);
+      await page.bringToFront();
+      await expect.poll(async () => (await currentStatus()).reason).toBe("No CJK text");
+      await page.waitForTimeout(350);
+      await page.evaluate(({ text, placement }) => {
+        const skeleton = document.querySelector<HTMLElement>("#skeleton")!;
+        skeleton.style.display = "none";
+        const paragraph = document.createElement("p");
+        paragraph.id = "prose";
+        paragraph.textContent = text.repeat(3);
+        if (placement === "main") {
+          const main = document.createElement("main");
+          main.append(paragraph);
+          document.body.append(main);
+        } else document.querySelector("#portal")!.append(paragraph);
+      }, fixture);
+      await expect.poll(async () => (await currentStatus()).pageVariant, { timeout: 2500 }).toBe(fixture.language);
+      await expect.poll(async () => (await currentStatus()).changedElements).toBe(1);
+    } finally { await page.close(); }
+  });
+}
+
+test("rechecks a skeleton hidden by its ancestor after the new view was inserted", async () => {
+  await worker.evaluate(() => chrome.storage.sync.set({ fontJP: "CJ Test Japanese", preserveWebsiteFonts: false,
+    simpleMode: false, dynamicDetection: true, mixedLanguageDetection: false, siteOverrides: {}, siteDomainOverrides: {} }));
+  const page = await context.newPage();
+  try {
+    await page.route("https://fixture.test/skeleton-delayed-hide", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<html lang=en><head><title>Loading view</title><style>
+        .retired { display: none; } #portal { display: contents; }
+        </style></head><body><div id=old-view><main>Loading...</main></div><div id=portal></div></body></html>`
+    }));
+    await page.goto("https://fixture.test/skeleton-delayed-hide");
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).reason).toBe("No CJK text");
+    await page.waitForTimeout(350);
+    await page.locator("#portal").evaluate((element, text) => {
+      const paragraph = document.createElement("p");
+      paragraph.id = "prose";
+      paragraph.textContent = text.repeat(3);
+      element.append(paragraph);
+    }, JAPANESE);
+    await page.waitForTimeout(350);
+    expect((await currentStatus()).reason).toBe("No CJK text");
+    await page.locator("#old-view").evaluate((element) => { element.setAttribute("class", "retired"); });
+    await expect.poll(async () => (await currentStatus()).pageVariant, { timeout: 2500 }).toBe("jp");
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(1);
+  } finally { await page.close(); }
+});
+
+test("keeps English mutation bursts dormant without page sampling or style reads", async () => {
+  await worker.evaluate(() => chrome.storage.sync.set({ preserveWebsiteFonts: false, simpleMode: false,
+    dynamicDetection: true, mixedLanguageDetection: false, siteOverrides: {}, siteDomainOverrides: {} }));
+  const page = await context.newPage();
+  const cdp = await context.newCDPSession(page);
+  let executionContextId: number | undefined;
+  cdp.on("Runtime.executionContextCreated", ({ context: executionContext }) => {
+    if (executionContext.auxData?.type === "isolated" && !executionContext.name.includes("playwright")) {
+      executionContextId = executionContext.id;
+    }
+  });
+  await cdp.send("Runtime.enable");
+  try {
+    await page.route("https://fixture.test/dormant-english-churn", (route) => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<html lang=en><head><title>English dashboard</title></head><body>
+        <main>${"<p>English reading content remains unchanged during background activity.</p>".repeat(1000)}</main>
+        <div id=activity><span id=ticker>Loading updates</span></div></body></html>`
+    }));
+    await page.goto("https://fixture.test/dormant-english-churn");
+    await page.bringToFront();
+    await expect.poll(async () => (await currentStatus()).reason).toBe("No CJK text");
+    await page.waitForTimeout(350);
+    expect(executionContextId).toBeDefined();
+    // Probe the extension's isolated world, where its own DOM reads occur.
+    await cdp.send("Runtime.evaluate", { contextId: executionContextId, expression: `(() => {
+      const metrics = globalThis.__cjkDormantProbe = { samples: 0, pageWalks: 0, styleReads: 0 };
+      const main = document.querySelector('main');
+      const walker = document.createTreeWalker;
+      document.createTreeWalker = function(root, whatToShow, ...rest) {
+        if (whatToShow === NodeFilter.SHOW_TEXT) metrics.samples++;
+        if (root === main || root === document.body) metrics.pageWalks++;
+        return walker.call(this, root, whatToShow, ...rest);
+      };
+      const styles = globalThis.getComputedStyle;
+      globalThis.getComputedStyle = function(...args) {
+        metrics.styleReads++;
+        return styles.apply(this, args);
+      };
+    })()` });
+    await page.evaluate(async () => {
+      const activity = document.querySelector<HTMLElement>("#activity")!;
+      const ticker = document.querySelector("#ticker")!.firstChild!;
+      const prose = document.querySelector("main p")!.firstChild!;
+      for (let frame = 0; frame < 20; frame++) {
+        for (let update = 0; update < 25; update++) {
+          activity.style.transform = `translateX(${update}px)`;
+          activity.className = `frame-${frame}-${update}`;
+          ticker.nodeValue = `Update ${frame}-${update}`;
+          prose.nodeValue = `English reading content ${frame}-${update}`;
+        }
+        const addition = document.createElement("span");
+        addition.textContent = `Background update ${frame}`;
+        activity.append(addition);
+        await new Promise(requestAnimationFrame);
+      }
+    });
+    await page.waitForTimeout(350);
+    const metrics = await cdp.send("Runtime.evaluate", { contextId: executionContextId,
+      expression: "globalThis.__cjkDormantProbe", returnByValue: true });
+    expect(metrics.result.value).toEqual({ samples: 0, pageWalks: 0, styleReads: 0 });
+    expect((await currentStatus()).reason).toBe("No CJK text");
+    // A sidebar in another language does not replace an intact English main.
+    await page.locator("#activity").evaluate((element) => { element.append("日本語のサイドバー"); });
+    await page.waitForTimeout(350);
+    expect((await currentStatus()).reason).toBe("No CJK text");
+    const afterSidebar = await cdp.send("Runtime.evaluate", { contextId: executionContextId,
+      expression: "globalThis.__cjkDormantProbe.samples", returnByValue: true });
+    expect(afterSidebar.result.value).toBe(0);
+  } finally { await cdp.detach(); await page.close(); }
+});
+
 test("does not trust an English body lang for Chinese content", async () => {
   await worker.evaluate(async () => {
     await chrome.storage.sync.clear();

@@ -40,6 +40,7 @@ export class PageObserver {
   private observer: MutationObserver | null = null;
   private observedShadowRoots = new WeakSet<ShadowRoot>();
   private observedUrl = "";
+  private dormantExternalCjk = false;
 
   constructor(private readonly dependencies: PageObserverDependencies) {}
 
@@ -49,6 +50,7 @@ export class PageObserver {
     this.observer = null;
     simpleMode.stopBootstrap();
     this.observedShadowRoots = new WeakSet();
+    this.dormantExternalCjk = false;
     document.removeEventListener("input", this.handleInput, true);
 
     const current = settings();
@@ -75,6 +77,7 @@ export class PageObserver {
       this.handleDormantMutations(mutations, dynamic, redetectPage);
       return;
     }
+    this.dormantExternalCjk = false;
 
     const { managedStyles, updates } = this.dependencies;
     const rules = managedStyles.rules;
@@ -224,6 +227,10 @@ export class PageObserver {
       if (!dynamic) continue;
       if (mutation.type === "attributes") {
         if (mutation.target === document.documentElement && mutation.attributeName === "lang") wake = true;
+        // A renderer may insert the new view before hiding the old skeleton.
+        // Purely English churn never enables this visibility check.
+        if (this.dormantExternalCjk && ["style", "class", "hidden"].includes(mutation.attributeName || "") &&
+            languageDetector.reconsiderHiddenSample(mutation.target)) wake = true;
         continue;
       }
 
@@ -235,8 +242,16 @@ export class PageObserver {
         if (subtreeContainsCjk(target)) wake = true;
         continue;
       }
-      if (!languageDetector.touchesSample(target) &&
-          !Array.from(mutation.addedNodes).some((node) => languageDetector.touchesSample(node, true))) continue;
+      if (!languageDetector.touchesSample(target)) {
+        const hasCjk = mutation.type === "characterData"
+          ? CJK_TEXT_RE.test(mutation.target.nodeValue || "")
+          : Array.from(mutation.addedNodes).some(subtreeContainsCjk);
+        if (hasCjk) {
+          this.dormantExternalCjk = true;
+          if (languageDetector.reconsiderHiddenSample()) wake = true;
+        }
+        if (!Array.from(mutation.addedNodes).some((node) => languageDetector.touchesSample(node, true))) continue;
+      }
       if (mutation.type === "characterData") {
         if (CJK_TEXT_RE.test(mutation.target.nodeValue || "")) wake = true;
       } else if (mutation.type === "childList" &&
@@ -333,7 +348,7 @@ export class PageObserver {
       characterData: true,
       characterDataOldValue: true,
       attributes: true,
-      attributeFilter: ["lang", "class", "style", "placeholder", "value", "rel", "href", "media", "disabled", "role"]
+      attributeFilter: ["lang", "class", "style", "hidden", "placeholder", "value", "rel", "href", "media", "disabled", "role"]
     };
   }
 

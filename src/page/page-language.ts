@@ -63,18 +63,23 @@ function hasDominantJapaneseSegments(sample: string): boolean {
 export class PageLanguageDetector {
   private sampleRoot: Element | null = null;
   private cache: AutomaticDetectionCache | null = null;
+  private skipHiddenRegions = false;
 
   /** Prefer main content, or a shared article container on result-list pages. */
   collectSample(limit = 10000): string {
     // Re-evaluate the root when detection runs: a SPA can add more articles
     // after its first result without removing that first article.
-    this.sampleRoot = this.chooseSampleRoot();
+    const hiddenRegions: Element[] = [];
+    this.sampleRoot = this.chooseSampleRoot(hiddenRegions);
     const preferred = this.sampleRoot;
     if (!preferred) return document.title || "";
     const walker = document.createTreeWalker(preferred, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
         const parent = node.parentElement;
         if (!parent || parent.closest(EXCLUDED)) return NodeFilter.FILTER_REJECT;
+        if (hiddenRegions.length && hiddenRegions.some((region) => region.contains(parent))) {
+          return NodeFilter.FILTER_REJECT;
+        }
         const value = node.nodeValue?.replace(/\s+/g, " ").trim();
         return value ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
       }
@@ -88,13 +93,49 @@ export class PageLanguageDetector {
     return sample.slice(0, limit);
   }
 
-  private chooseSampleRoot(): Element | null {
-    const main = document.querySelector("main") || document.querySelector("[role='main']");
+  /** Only candidate reading regions need style reads, never every text owner. */
+  private regionIsHidden(region: Element): boolean {
+    for (let current: Element | null = region; current; current = current.parentElement) {
+      if (getComputedStyle(current).display === "none") return true;
+    }
+    return false;
+  }
+
+  reconsiderHiddenSample(changedAncestor?: Node): boolean {
+    if (!this.sampleRoot) return false;
+    if (changedAncestor && changedAncestor !== this.sampleRoot &&
+        !changedAncestor.contains(this.sampleRoot)) return false;
+    if (!this.regionIsHidden(this.sampleRoot)) return false;
+    // Enable visibility-aware selection only after CJK arrives outside a
+    // hidden old view. Ordinary English startup does not need style reads.
+    this.skipHiddenRegions = true;
+    return true;
+  }
+
+  private chooseSampleRoot(hiddenRegions: Element[] = []): Element | null {
+    const visible = (region: Element): boolean => {
+      if (!this.skipHiddenRegions) return true;
+      if (!this.regionIsHidden(region)) return true;
+      hiddenRegions.push(region);
+      return false;
+    };
+    const firstVisible = (selector: string): Element | undefined => {
+      const first = document.querySelector(selector);
+      if (!first) return undefined;
+      if (visible(first)) return first;
+      return Array.from(document.querySelectorAll(selector)).find((region) => region !== first && visible(region));
+    };
+    const main = firstVisible("main") || firstVisible("[role='main']");
     if (main) return main;
 
     const articles = document.querySelectorAll("article");
-    const first = articles[0];
-    const second = articles[1];
+    let first: Element | undefined;
+    let second: Element | undefined;
+    for (const article of articles) {
+      if (!visible(article)) continue;
+      if (!first) first = article;
+      else { second = article; break; }
+    }
     if (!first) return document.body;
     if (!second) return first;
 

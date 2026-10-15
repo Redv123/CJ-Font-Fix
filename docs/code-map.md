@@ -24,6 +24,7 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 | Store conservative Japanese character clues | `src/language/japanese-character-clues.ts` | `JAPANESE_CHARACTER_CLUES` |
 | Select the page sample and final page variant | `src/page/page-language.ts` | `PageLanguageDetector.collectSample()`, `detect()` |
 | Decide whether a DOM change touches or replaces the sample | `src/page/page-language.ts` | `touchesSample()`, `sampleRootWasRemoved()`, `sampleRegionChanged()` |
+| Reselect a hidden skeleton after CJK arrives outside its sample | `src/page/page-language.ts`, `src/page/page-observer.ts` | `reconsiderHiddenSample()`, `handleDormantMutations()` |
 | Respect explicit descendant CJK `lang` | `src/page/element-language.ts` | `ElementLanguage.explicitVariantFor()`, `browserHandlesLanguageFor()` |
 | Calculate local SC, TC, and JP evidence | `src/language/local-evidence.ts` | `analyzeCjkEvidence()` |
 | Gate mixed Chinese/Japanese pages | `src/language/local-evidence.ts` | `hasStrongChineseJapaneseMix()` |

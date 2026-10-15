@@ -25,6 +25,7 @@ These are the behavioral constraints and reasons to preserve when changing the p
 - Re-select the sample when a `role` change actually switches primary content, even on a no-CJK page. Cached SPA views can remain connected after a history scan reads the old view. Other role changes cause no font work; use the existing scheduler without adding a fixed navigation wait.
 - A close browser Chinese/Japanese result may use multiple independently supported Japanese passages for corroboration. This is a page-level decision, separate from experimental mixed detection. Duplicate passages count once for corroboration; the original sample is not deduplicated.
 - Retain sample text without per-parent `checkVisibility()` filtering or broad deduplication unless a demonstrated failure justifies changing it. `display: contents` can make visible text fail a parent check, and repeated titles can be valid evidence. Any visibility filter also needs to invalidate results when visibility changes.
+- A dormant SPA must recover when a hidden skeleton remains connected and CJK arrives in another region. Check candidate-region visibility only after observing that CJK; English-only attribute churn must not start visibility polling or whole-page sampling. An intact English main remains authoritative over another-language sidebar.
 
 ## Experimental mixed-language detection
 

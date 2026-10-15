@@ -24,6 +24,8 @@ After a click, ordinary dynamic Advanced mode can process a small queued local u
 
 A cached SPA view may become primary after a history scan has already read the old view. The `role` check catches that later switch, including on the dormant no-CJK path, without adding a navigation wait. With dynamic detection disabled, DOM observation retains removal cleanup instead of correction for later additions; settings and font events still have their own update paths.
 
+On a dormant page, CJK added outside the current sample can wake detection if the old reading region, or its ancestor, is now `display: none`. If the content arrives first, a later style/class/hidden change covering the old region can complete the switch. Ordinary English mutations do not enable these computed-style checks or request a new page sample; text checks stay within changed content. After such a switch is discovered, selection skips hidden reading-region candidates, excluding their text if sampling falls back to `body`. `display: contents` remains eligible. No per-text-owner visibility checks or additional minimum CJK length are used.
+
 Simple mode has separate startup observation: it stops when a variant is found or after its two-second window. It remembers the original root `lang` for restoration and never applies per-element font CSS.
 
 ## Language sampling
