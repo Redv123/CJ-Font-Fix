@@ -4,6 +4,7 @@
  * the closed icon until a page reports actual intervention.
  */
 import { getInstalledFonts, validChoice } from "../settings/font-catalog";
+import { installedCjkFamilies } from "../fonts/font-support";
 import { FONT_SETTINGS, LEGACY_PRESERVE_KEYS, preserveWebsiteFontsFromStorage } from "../settings/defaults";
 import type { FontSettingKey } from "../settings/defaults";
 import { isSiteChoice, normalizeHostname, sanitizeSiteOverrides, siteRulesFromStorage } from "../settings/site-overrides";
@@ -26,13 +27,44 @@ const ACTION_ICONS = {
 } as const;
 
 const tabStates = new Map<number, boolean>();
-let fontListRequest: Promise<InstalledFont[]> | null = null;
+const FONT_FAMILIES_KEY = "installedCjkFamilies";
+let fontListRequest: Promise<{ fonts: InstalledFont[]; families: string[] }> | null = null;
+let fontFamiliesRequest: Promise<string[]> | null = null;
 
-/** Share concurrent enumerations, then let later documents see newly installed fonts. */
-function getRuntimeFonts(): Promise<InstalledFont[]> {
-  fontListRequest ??= getInstalledFonts().finally(() => { fontListRequest = null; });
+/** Installation also needs the full list for font-choice validation. */
+function getRuntimeFonts(): Promise<{ fonts: InstalledFont[]; families: string[] }> {
+  fontListRequest ??= (async () => {
+    const fonts = await getInstalledFonts();
+    const families = installedCjkFamilies(fonts);
+    try {
+      await chrome.storage.session.set({ [FONT_FAMILIES_KEY]: families });
+    } catch (error) {
+      console.warn("CJ Font Fallback Fix could not cache installed font names:", error);
+    }
+    return { fonts, families };
+  })().finally(() => { fontListRequest = null; });
   return fontListRequest;
 }
+
+/** Session storage survives worker sleep and resets on browser/extension restart. */
+function getRuntimeFontFamilies(): Promise<string[]> {
+  fontFamiliesRequest ??= (async () => {
+    try {
+      const saved = await chrome.storage.session.get(FONT_FAMILIES_KEY);
+      if (Array.isArray(saved[FONT_FAMILIES_KEY])) return saved[FONT_FAMILIES_KEY] as string[];
+    } catch (error) {
+      console.warn("CJ Font Fallback Fix could not read cached font names:", error);
+    }
+    return (await getRuntimeFonts()).families;
+  })().finally(() => { fontFamiliesRequest = null; });
+  return fontFamiliesRequest;
+}
+
+chrome.runtime.onStartup.addListener(() => {
+  void getRuntimeFontFamilies().catch((error) => {
+    console.warn("CJ Font Fallback Fix could not initialize installed font names:", error);
+  });
+});
 
 function isActionStateMessage(message: unknown): message is ActionStateMessage {
   if (!message || typeof message !== "object") return false;
@@ -82,7 +114,7 @@ chrome.runtime.onInstalled.addListener(async () => {
       }
       await chrome.storage.sync.remove([...LEGACY_PRESERVE_KEYS]);
     }
-    const fonts = await getRuntimeFonts();
+    const { fonts } = await getRuntimeFonts();
     if (!fonts.length) return;
     const keys = Object.keys(FONT_SETTINGS) as FontSettingKey[];
     const stored = await chrome.storage.sync.get(keys);
@@ -148,10 +180,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
     return true;
   }
-  if (message?.type === "getInstalledFonts") {
+  if (message?.type === "getInstalledFontFamilies") {
     void (async () => {
       try {
-        sendResponse(await getRuntimeFonts());
+        sendResponse(await getRuntimeFontFamilies());
       } catch (error) {
         console.warn("CJ Font Fallback Fix could not read installed fonts:", error);
         sendResponse([]);

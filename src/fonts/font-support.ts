@@ -12,13 +12,25 @@ const CJK_NAME_RE = /(?:cjk|source\s*han|思源|noto\s*(?:sans|serif)?\s*(?:sc|t
 
 export { regionalVariantForFamily } from "./font-family";
 
+/** Prepare only names that can participate in website-font preservation. */
+export function installedCjkFamilies(fonts: readonly InstalledFont[]): string[] {
+  const families = new Set<string>();
+  for (const font of fonts) {
+    for (const name of [font.fontId, font.displayName]) {
+      const key = normalizeFamily(name).toLowerCase();
+      if (CJK_NAME_RE.test(key) || isFangsongFamily(key)) families.add(key);
+    }
+  }
+  return [...families];
+}
+
 /**
  * Decides whether an existing reachable family makes injection unnecessary.
  * Browser font APIs cannot reveal the exact fallback used for one glyph, so
  * this combines declared @font-face coverage, known CJK names, and availability.
  */
 export class FontSupport {
-  private readonly installedFamilies = new Set<string>();
+  private installedFamilies: ReadonlySet<string> = new Set();
   private readonly customCjkFamilies = new Set<string>();
   private metadataDirty = true;
   private platformOs: string | null = null;
@@ -27,14 +39,8 @@ export class FontSupport {
     this.platformOs = os;
   }
 
-  setInstalledFonts(fonts: readonly InstalledFont[]): void {
-    this.installedFamilies.clear();
-    for (const font of fonts) {
-      for (const name of [font.fontId, font.displayName]) {
-        const key = normalizeFamily(name).toLowerCase();
-        if (CJK_NAME_RE.test(key) || isFangsongFamily(key)) this.installedFamilies.add(key);
-      }
-    }
+  setInstalledFamilies(families: readonly string[]): void {
+    this.installedFamilies = new Set(families);
   }
 
   markMetadataDirty(): void {

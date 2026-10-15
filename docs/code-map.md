@@ -47,7 +47,7 @@ Use this index to locate an implementation owner. Read [architecture](architectu
 | Choose Sans or Serif from the website stack | `src/fonts/font-family.ts` | `usesSerifFallback()` |
 | Preserve an available website CJK font | `src/fonts/font-support.ts` | `FontSupport.shouldPreserve()` |
 | Track website `@font-face` coverage | `src/fonts/font-support.ts` | `refreshCustomFonts()`, `markMetadataDirty()` |
-| Match installed font IDs and display names | `src/fonts/font-support.ts` | `setInstalledFonts()`, `shouldPreserve()` |
+| Prepare and reuse installed CJK font names | `src/fonts/font-support.ts`, `src/entries/background.ts` | `installedCjkFamilies()`, `getRuntimeFontFamilies()`, `setInstalledFamilies()` |
 | Classify an `@font-face unicode-range` | `src/fonts/unicode-range.ts` | `classifyUnicodeRange()` |
 | Record, restore, and summarize managed elements | `src/fallback/managed-styles.ts` | `ManagedStyles.commit()`, `restore()`, `restoreAll()`, `summary()` |
 | Share generated CSS rules between identical stacks | `src/fallback/font-stack-rules.ts` | `FontStackRules.acquire()`, `release()`, `render()` |

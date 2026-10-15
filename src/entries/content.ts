@@ -15,7 +15,7 @@ import { subtreeContainsCjk } from "../page/candidate-scan";
 import { UpdateQueue } from "../page/update-queue";
 import { DEFAULTS, SETTINGS_STORAGE_KEYS, settingsFromStorage } from "../settings/defaults";
 import { getPlatformOs } from "../shared/platform";
-import type { ActionStateMessage, ContentMessage, InstalledFont, Settings } from "../shared/types";
+import type { ActionStateMessage, ContentMessage, Settings } from "../shared/types";
 
 /**
  * Coordinates the content-script lifecycle.
@@ -207,11 +207,11 @@ function startContentApplication(): void {
     if (installedFontsLoaded) return;
     installedFontsLoaded = true;
     try {
-      const [fonts, os]: [InstalledFont[], chrome.runtime.PlatformInfo["os"] | null] = await Promise.all([
-        chrome.runtime.sendMessage({ type: "getInstalledFonts" }), getPlatformOs()
+      const [families, os]: [string[], chrome.runtime.PlatformInfo["os"] | null] = await Promise.all([
+        chrome.runtime.sendMessage({ type: "getInstalledFontFamilies" }), getPlatformOs()
       ]);
       fontSupport.setPlatform(os);
-      fontSupport.setInstalledFonts(fonts);
+      fontSupport.setInstalledFamilies(families);
     } catch (error) {
       // An unavailable catalog provides no evidence to skip configured fallback.
       console.warn("CJ Font Fallback Fix could not read installed fonts:", error);

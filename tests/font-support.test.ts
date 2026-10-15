@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { FontSupport, regionalVariantForFamily } from "../src/fonts/font-support";
+import { FontSupport, installedCjkFamilies, regionalVariantForFamily } from "../src/fonts/font-support";
 import { DEFAULTS } from "../src/settings/defaults";
 
 describe("regional CJK font names", () => {
@@ -23,7 +23,7 @@ describe("regional CJK font names", () => {
 
   it("does not preserve an available SC family when JP is required", () => {
     const support = new FontSupport();
-    support.setInstalledFonts([{ fontId: "Noto Sans CJK SC", displayName: "Noto Sans CJK SC" }]);
+    support.setInstalledFamilies(installedCjkFamilies([{ fontId: "Noto Sans CJK SC", displayName: "Noto Sans CJK SC" }]));
     const settings = { ...DEFAULTS, preserveWebsiteFonts: true };
     expect(support.shouldPreserve(["Noto Sans CJK SC", "sans-serif"], settings, "jp"))
       .toBe(false);
@@ -38,16 +38,16 @@ describe("regional CJK font names", () => {
 
   it("matches font IDs and display names without case, spacing, or surrounding quotes", () => {
     const support = new FontSupport();
-    support.setInstalledFonts([{ fontId: " NotoSansCJKSC ", displayName: " Noto Sans CJK SC " }]);
+    support.setInstalledFamilies(installedCjkFamilies([{ fontId: " NotoSansCJKSC ", displayName: " Noto Sans CJK SC " }]));
     expect(support.shouldPreserve(["notosanscjksc", "sans-serif"], DEFAULTS, "sc")).toBe(true);
     expect(support.shouldPreserve([' "noto sans cjk sc" ', "sans-serif"], DEFAULTS, "sc")).toBe(true);
-    support.setInstalledFonts([]);
+    support.setInstalledFamilies([]);
     expect(support.shouldPreserve(["Noto Sans CJK SC", "sans-serif"], DEFAULTS, "sc")).toBe(false);
   });
 
   it("retains only installed names eligible for the website-font preservation decision", () => {
     const support = new FontSupport();
-    support.setInstalledFonts([
+    const families = installedCjkFamilies([
       { fontId: "Arial", displayName: "Arial" },
       { fontId: "Times New Roman", displayName: "Times New Roman" },
       { fontId: "Noto Color Emoji", displayName: "Noto Color Emoji" },
@@ -55,6 +55,8 @@ describe("regional CJK font names", () => {
       { fontId: "Unclassified Font ID", displayName: "PingFang SC" },
       { fontId: "FandolFang", displayName: "仿宋" }
     ]);
+    expect(families).toEqual(["notosanscjksc", "pingfang sc", "fandolfang", "仿宋"]);
+    support.setInstalledFamilies(families);
     for (const family of ["Arial", "Times New Roman", "Noto Color Emoji",
       "Unclassified Display Alias", "Unclassified Font ID"]) {
       expect(support.shouldPreserve([family, "sans-serif"], DEFAULTS, "sc")).toBe(false);
@@ -66,8 +68,8 @@ describe("regional CJK font names", () => {
 
   it("preserves an available Fangsong for Chinese, but not Japanese", () => {
     const support = new FontSupport();
-    support.setInstalledFonts(["FangSong", "FangSong SC", "STFangsong", "仿宋", "FandolFang"]
-      .map((name) => ({ fontId: name, displayName: name })));
+    support.setInstalledFamilies(installedCjkFamilies(["FangSong", "FangSong SC", "STFangsong", "仿宋", "FandolFang"]
+      .map((name) => ({ fontId: name, displayName: name }))));
     expect(support.shouldPreserve(["FangSong", "sans-serif"], DEFAULTS, "sc")).toBe(true);
     expect(support.shouldPreserve(["FangSong SC", "sans-serif"], DEFAULTS, "tc")).toBe(true);
     expect(support.shouldPreserve(["STFangsong", "sans-serif"], DEFAULTS, "sc")).toBe(true);
@@ -90,7 +92,7 @@ describe("regional CJK font names", () => {
     });
     try {
       const support = new FontSupport();
-      support.setInstalledFonts([{ fontId: "Arial", displayName: "Arial" }]);
+      support.setInstalledFamilies(installedCjkFamilies([{ fontId: "Arial", displayName: "Arial" }]));
       for (const family of ["Microsoft YaHei", "PingFang SC", "FangSong", "CJK Missing Font"]) {
         expect(support.shouldPreserve([family, "sans-serif"], DEFAULTS, "sc")).toBe(false);
       }
@@ -152,7 +154,7 @@ describe("Linux system replacements for Windows CJK fonts", () => {
       ...DEFAULTS, preserveWebsiteFonts: false
     }, "sc")).toBe(false);
     // Disabling the exception does not stop ordinary installed-font preservation.
-    support.setInstalledFonts([{ fontId: "Microsoft YaHei", displayName: "Microsoft YaHei" }]);
+    support.setInstalledFamilies(installedCjkFamilies([{ fontId: "Microsoft YaHei", displayName: "Microsoft YaHei" }]));
     expect(support.shouldPreserve(["Microsoft YaHei", "sans-serif"], {
       ...DEFAULTS, trustWindowsFonts: false
     }, "sc")).toBe(true);

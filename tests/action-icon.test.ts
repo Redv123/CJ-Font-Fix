@@ -18,13 +18,14 @@ describe("site-rule update cleanup", () => {
     let firstRead = true;
     vi.stubGlobal("chrome", {
       runtime: {
+        onStartup: { addListener: () => undefined },
         onInstalled: { addListener: (listener: typeof onInstalled) => { onInstalled = listener; } },
         onMessage: { addListener: (listener: typeof onMessage) => { onMessage = listener; } }
       },
       tabs: { onUpdated: { addListener: () => undefined }, onRemoved: { addListener: () => undefined } },
       publicSuffix: { getDomain: () => "example.com" },
       fontSettings: { getFontList: async () => [] },
-      storage: { sync: {
+      storage: { session: { set: async () => undefined }, sync: {
         get: async (keys: string[]) => {
           const snapshot = structuredClone(Object.fromEntries(keys.filter((key) => Object.hasOwn(stored, key)).map((key) => [key, stored[key]])));
           if (firstRead) {
@@ -58,6 +59,7 @@ describe("toolbar icon across navigations", () => {
     const icons: string[] = [];
     vi.stubGlobal("chrome", {
       runtime: {
+        onStartup: { addListener: () => undefined },
         onMessage: { addListener: (listener: typeof onMessage) => { onMessage = listener; } },
         onInstalled: { addListener: () => undefined }
       },

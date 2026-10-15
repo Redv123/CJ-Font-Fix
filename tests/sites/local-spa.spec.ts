@@ -34,6 +34,9 @@ test.beforeAll(async () => {
     ]
   });
   worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
+  await expect.poll(() => worker.evaluate(async () =>
+    Array.isArray((await chrome.storage.session.get("installedCjkFamilies")).installedCjkFamilies)
+  )).toBe(true);
 });
 
 test.afterAll(async () => {
@@ -41,8 +44,8 @@ test.afterAll(async () => {
   if (profileDirectory) await rm(profileDirectory, { recursive: true, force: true });
 });
 
-test("preserves website fonts using the worker catalog without reloading it during DOM updates", async () => {
-  const catalog = await worker.evaluateHandle(() => {
+test("reuses the worker's prepared font names across DOM updates and page loads", async () => {
+  const catalog = await worker.evaluateHandle(async () => {
     const state = { reads: 0, original: chrome.fontSettings.getFontList };
     Object.defineProperty(chrome.fontSettings, "getFontList", { configurable: true, value: async () => {
       state.reads++;
@@ -51,6 +54,7 @@ test("preserves website fonts using the worker catalog without reloading it duri
         { fontId: "Hiragino Sans CatalogFixture", displayName: "Hiragino Sans CatalogFixture" }
       ];
     } });
+    await chrome.storage.session.remove("installedCjkFamilies");
     return state;
   });
   const page = await context.newPage();
@@ -86,11 +90,18 @@ test("preserves website fonts using the worker catalog without reloading it duri
       document.querySelector("main")!.append(paragraph);
     });
     await expect.poll(async () => (await currentStatus()).changedElements).toBe(3);
+    await page.reload();
+    await expect.poll(async () => (await currentStatus()).changedElements).toBe(2);
     expect(await catalog.evaluate((state) => state.reads)).toBe(1);
+    const saved = await worker.evaluate(() => chrome.storage.session.get("installedCjkFamilies"));
+    expect(saved.installedCjkFamilies).toEqual(expect.arrayContaining([
+      "notosanscjkcatalogfixture", "noto sans cjk sc catalogfixture", "hiragino sans catalogfixture"
+    ]));
   } finally {
     await page.close();
-    await catalog.evaluate((state) => {
+    await catalog.evaluate(async (state) => {
       Object.defineProperty(chrome.fontSettings, "getFontList", { value: state.original });
+      await chrome.storage.session.remove("installedCjkFamilies");
     });
     await catalog.dispose();
   }
@@ -100,10 +111,11 @@ test("keeps configured fallback working when the worker cannot read installed fo
   const original = await worker.evaluateHandle(() => chrome.fontSettings.getFontList);
   const page = await context.newPage();
   try {
-    await worker.evaluate(() => {
+    await worker.evaluate(async () => {
       Object.defineProperty(chrome.fontSettings, "getFontList", { configurable: true, value: async () => {
         throw new Error("Simulated unavailable font catalog");
       } });
+      await chrome.storage.session.remove("installedCjkFamilies");
       return chrome.storage.sync.set({ fontSC: "CJ Test Sans", preserveWebsiteFonts: true, trustWindowsFonts: false,
         simpleMode: false, siteOverrides: { "fixture.test": "sc" } });
     });
@@ -126,13 +138,14 @@ test("keeps configured fallback working when the worker cannot read installed fo
   }
 });
 
-test("loads the font catalog only when website-font preservation becomes necessary", async () => {
-  const catalog = await worker.evaluateHandle(() => {
+test("only requests the shared font names when website-font preservation becomes necessary", async () => {
+  const catalog = await worker.evaluateHandle(async () => {
     const state = { reads: 0, original: chrome.fontSettings.getFontList };
     Object.defineProperty(chrome.fontSettings, "getFontList", { configurable: true, value: async () => {
       state.reads++;
       return [];
     } });
+    await chrome.storage.session.remove("installedCjkFamilies");
     return state;
   });
   const page = await context.newPage();
@@ -163,8 +176,9 @@ test("loads the font catalog only when website-font preservation becomes necessa
     await expect.poll(async () => (await currentStatus()).changedElements).toBe(1);
   } finally {
     await page.close();
-    await catalog.evaluate((state) => {
+    await catalog.evaluate(async (state) => {
       Object.defineProperty(chrome.fontSettings, "getFontList", { value: state.original });
+      await chrome.storage.session.remove("installedCjkFamilies");
     });
     await catalog.dispose();
   }
