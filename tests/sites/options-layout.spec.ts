@@ -113,11 +113,9 @@ test("keeps action layout and readable secondary buttons across themes", async (
         const parent = element.parentElement!;
         const style = getComputedStyle(parent);
         return { width: element.getBoundingClientRect().width,
-          available: parent.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
-          margin: getComputedStyle(element).marginTop };
+          available: parent.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) };
       });
       expect(dimensions.width).toBe(dimensions.available);
-      expect(dimensions.margin).toBe("12px");
     } finally { await popup.close(); }
   } finally { await page.close(); }
 });

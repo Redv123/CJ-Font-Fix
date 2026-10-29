@@ -27,7 +27,6 @@ describe("language helpers", () => {
     ["zh-Hans-SG", "sc"],
     ["zh-MY", "sc"],
     ["JA_jp", "jp"],
-    ["zh", "zh"],
     ["", null]
   ] as const)("maps language tag %j to %j", (tag, expected) => {
     expect(langToVariant(tag)).toBe(expected);

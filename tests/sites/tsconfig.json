@@ -3,6 +3,6 @@
   "compilerOptions": {
     "types": ["chrome", "node", "@playwright/test"]
   },
-  "include": ["../../playwright.sites.config.ts", ".", "../../src/shared/types.ts"],
+  "include": ["../../playwright.sites.config.ts", "../../playwright.local.config.ts", ".", "../../src/shared/types.ts"],
   "exclude": []
 }

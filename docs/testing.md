@@ -13,6 +13,7 @@ Choose checks for the behavior being changed. Unit tests establish deterministic
 | Command | Checks |
 | --- | --- |
 | `npm test` | Fast Vitest rules for language clues, font stacks, queues, settings, and DOM helpers |
+| `npm run test:local` | Build, typecheck, and run local webpage plus extension UI checks without live-site/corpus/font-dependent suites; no retries |
 | `npm run typecheck` | Source and unit-test TypeScript |
 | `npm run typecheck:sites` | Browser-test TypeScript |
 | `npm run build` | Typecheck and rebuild the loadable MV3 extension in `dist` |
@@ -31,6 +32,12 @@ Install the browser binaries matching the current Playwright dependency before t
 ```
 
 This includes full Chromium for extension tests and the separate headless shell used by default Playwright page fixtures. If only the shell is missing, use `./node_modules/.bin/playwright install chromium-headless-shell`.
+
+### Automated gate
+
+`playwright.local.config.ts` reuses the site-suite settings and excludes the live-site, corpus, and rendered-font suites. New ordinary browser specs join the local gate by default. Keep any new network-dependent or separately provisioned suite out of that gate explicitly. The **Checks** workflow runs unit tests and `test:local` on pushes to `main` and pull requests. The release workflow calls the same checks and waits for success before packaging; browser dependencies are installed in CI. A failed attempt fails the local gate rather than being hidden by a retry. Available browser failure artifacts are retained for seven days.
+
+The popup layout cases load the built extension's `popup.html`, let its entry initialize, and query a local HTTP page or a browser-protected active tab through real extension messaging. They verify page state, version, and shipped styles without filling output fields or adding CSS. The harness opens the extension page in a tab; it does not establish native toolbar-popup window sizing.
 
 ### Regression evidence
 

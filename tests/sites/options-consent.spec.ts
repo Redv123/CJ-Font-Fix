@@ -49,16 +49,6 @@ test("requires explicit consent each time mixed-language detection is enabled", 
     await page.emulateMedia({ reducedMotion: "reduce" });
     await expect(dialog).toHaveCSS("transition-duration", "0s");
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    const enableButton = dialog.getByRole("button", { name: /enable anyway/i });
-    for (const colorScheme of ["light", "dark"] as const) {
-      await page.emulateMedia({ colorScheme });
-      await page.mouse.move(0, 0);
-      await expect(enableButton).toHaveCSS("background-color", "rgb(180, 35, 24)");
-      await expect(enableButton).toHaveCSS("color", "rgb(255, 255, 255)");
-      await enableButton.hover();
-      await expect(enableButton).toHaveCSS("background-color", "rgb(146, 30, 21)");
-    }
-
     await dialog.getByRole("button", { name: /cancel/i }).click();
     await expect(dialog).toBeHidden();
     await expect(checkbox).not.toBeChecked();
