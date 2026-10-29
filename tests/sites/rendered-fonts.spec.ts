@@ -138,4 +138,71 @@ test.describe("@rendered-fonts actual CJK glyph selection", () => {
       }
     });
   }
+
+  test("preserves a tiny logo font without treating it as coverage for prose", async ({}, testInfo) => {
+    const page = await context.newPage();
+    try {
+      await worker.evaluate(() => chrome.storage.sync.set({
+        fontSC: "Noto Sans CJK SC", preserveWebsiteFonts: true, trustWindowsFonts: false,
+        simpleMode: false, dynamicDetection: true, mixedLanguageDetection: false,
+        siteOverrides: { "fixture.test": "sc" }, siteDomainOverrides: {}
+      }));
+      await page.route("https://fixture.test/tiny-font", (route) => route.fulfill({
+        contentType: "text/html; charset=utf-8",
+        body: `<html lang="en"><head><style>
+          @font-face { font-family: "Site Logo"; src: local("NotoSerifCJKjp-Regular"); unicode-range: U+54C1; }
+          @font-face { font-family: "Site Logo"; src: local("NotoSerifCJKjp-Regular"); unicode-range: U+724C; }
+          @font-face { font-family: "Site Symbols"; src: local("NotoSerifCJKjp-Regular"); unicode-range: U+4E00; }
+          body { font-family: "Site Logo", sans-serif; }
+          input, textarea { font: inherit; }
+          #symbols { font-family: "Site Symbols", sans-serif; }
+          </style></head><body><main>
+          <p id="logo">品牌</p><p id="prose">中文正文</p><p id="symbols">一段中文</p>
+          <input id="input" value="品牌"><textarea id="textarea" placeholder="中文正文"></textarea>
+          <p><b id="nested">品牌</b><span id="sibling">中文正文</span></p>
+          <p id="direct-logo">品牌<span id="child-prose">中文正文</span></p>
+          </main></body></html>`
+      }));
+      await page.goto("https://fixture.test/tiny-font");
+      await page.bringToFront();
+      const cdp = await context.newCDPSession(page);
+      await cdp.send("DOM.enable");
+      await cdp.send("CSS.enable");
+      await expect.poll(() => renderedFonts(cdp, "#logo")).toEqual([
+        expect.objectContaining({ familyName: "Noto Serif CJK JP", glyphCount: 2, isCustomFont: false })
+      ]);
+      const logoBefore = await renderedFonts(cdp, "#logo");
+      for (const selector of ["#prose", "#symbols", "#textarea", "#sibling", "#child-prose"]) {
+        await expect.poll(() => page.locator(selector).evaluate((e) => getComputedStyle(e).fontFamily))
+          .toContain("Noto Sans CJK SC");
+      }
+      for (const selector of ["#logo", "#nested", "#input", "#direct-logo"]) {
+        expect(await page.locator(selector).evaluate((e) => getComputedStyle(e).fontFamily))
+          .not.toContain("Noto Sans CJK SC");
+      }
+      const prose = await renderedFonts(cdp, "#prose");
+      expect(prose).toEqual([
+        expect.objectContaining({ postScriptName: "NotoSansCJKsc-Regular", glyphCount: 4 })
+      ]);
+      // Editing the same owner must not reuse a decision made for its former text.
+      await page.locator("#input").fill("中文正文");
+      await expect.poll(() => page.locator("#input").evaluate((e) => getComputedStyle(e).fontFamily))
+        .toContain("Noto Sans CJK SC");
+      await page.evaluate(() => { document.querySelector("#logo")!.textContent = "品牌中文"; });
+      await expect.poll(() => page.locator("#logo").evaluate((e) => getComputedStyle(e).fontFamily))
+        .toContain("Noto Sans CJK SC");
+      const changedLogo = await renderedFonts(cdp, "#logo");
+      expect(changedLogo).toEqual(expect.arrayContaining([
+        ...logoBefore,
+        expect.objectContaining({ postScriptName: "NotoSansCJKsc-Regular", glyphCount: 2, isCustomFont: false })
+      ]));
+      await page.evaluate(() => { document.querySelector("#logo")!.textContent = "品牌"; });
+      await expect.poll(() => page.locator("#logo").evaluate((e) => getComputedStyle(e).fontFamily))
+        .not.toContain("Noto Sans CJK SC");
+      await testInfo.attach("tiny-fonts.json", { contentType: "application/json", body: JSON.stringify({ prose, changedLogo }) });
+    } finally {
+      await page.close();
+    }
+  });
+
 });

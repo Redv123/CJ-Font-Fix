@@ -1,6 +1,3 @@
-/** Whether an @font-face declaration gives usable evidence of CJK coverage. */
-export type UnicodeRangeClass = "cjk" | "other" | "unknown";
-
 const CJK_BLOCKS: readonly (readonly [number, number])[] = [
   [0x3040, 0x30ff],
   [0x31f0, 0x31ff],
@@ -12,15 +9,14 @@ const CJK_BLOCKS: readonly (readonly [number, number])[] = [
 ];
 
 /**
- * Report CJK only for a parsed range overlapping the supported Han or kana
- * blocks. A missing, malformed, or universal range is unknown rather than
- * proof that the web font can replace a regional fallback.
+ * Intersect declared ranges with supported Han/kana blocks. Null means unknown
+ * (missing, malformed or universal), not evidence of regional font coverage.
  */
-export function classifyUnicodeRange(value: string): UnicodeRangeClass {
+export function cjkRanges(value: string): [number, number][] | null {
   const ranges = String(value || "").split(",").map((part) => part.trim()).filter(Boolean);
-  if (!ranges.length) return "unknown";
+  if (!ranges.length) return null;
   let parsedAny = false;
-  let coversCjk = false;
+  const coverage: [number, number][] = [];
   let isUniversal = false;
   for (const range of ranges) {
     const match = /^U\+([0-9A-F?]+)(?:-([0-9A-F]+))?$/i.exec(range);
@@ -31,12 +27,36 @@ export function classifyUnicodeRange(value: string): UnicodeRangeClass {
     const end = match[2]
       ? Number.parseInt(match[2], 16)
       : Number.parseInt(match[1].replace(/\?/g, "F"), 16);
-    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || end > 0x10ffff) continue;
     if (!wildcard && start === 0 && end >= 0x10ffff) isUniversal = true;
-    if (CJK_BLOCKS.some(([blockStart, blockEnd]) => start <= blockEnd && end >= blockStart)) {
-      coversCjk = true;
+    for (const [blockStart, blockEnd] of CJK_BLOCKS) {
+      if (start <= blockEnd && end >= blockStart) {
+        coverage.push([Math.max(start, blockStart), Math.min(end, blockEnd)]);
+      }
     }
   }
-  if (!parsedAny || isUniversal) return "unknown";
-  return coversCjk ? "cjk" : "other";
+  return !parsedAny || isUniversal ? null : coverage;
+}
+
+/** Match supported prose characters outside a small declared CJK set. */
+export function uncoveredCjkPattern(covered: ReadonlySet<number>): RegExp {
+  const escape = (code: number): string => `\\u{${code.toString(16)}}`;
+  const codes = [...covered].sort((a, b) => a - b);
+  const uncovered: string[] = [];
+  const append = (start: number, end: number): void => {
+    if (start <= end) uncovered.push(start === end ? escape(start) : `${escape(start)}-${escape(end)}`);
+  };
+  // A positive character class lets the regex engine search directly for a missing
+  // character instead of doing a negative lookahead at each position in the text.
+  for (const [start, end] of [[0x3005, 0x3005] as const, ...CJK_BLOCKS]) {
+    let next = start;
+    for (const code of codes) {
+      if (code < next) continue;
+      if (code > end) break;
+      append(next, code - 1);
+      next = code + 1;
+    }
+    append(next, end);
+  }
+  return new RegExp(`[${uncovered.join("")}]`, "u");
 }

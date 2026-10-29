@@ -159,7 +159,7 @@ export class FallbackController {
     // A run can touch hundreds of elements with the same computed stack. Keep
     // these decisions local to the run so later website CSS or font changes
     // are always read and evaluated again.
-    const plans = new Map<string, { fallback: string; skip: boolean }>();
+    const plans = new Map<string, { fallback: string; skip: boolean; uncovered: RegExp | null }>();
     const composedValues = new Map<string, string>();
     for (const entry of entries) {
       const { element, existing, variant, baseFamily } = entry;
@@ -168,13 +168,13 @@ export class FallbackController {
       if (!plan) {
         const families = parseFamilies(baseFamily);
         const fallback = this.fontForVariant(variant, usesSerifFallback(families), settings);
-        const skip = !fallback ||
-          hasEffectiveFallback(families, fallback, variant) ||
-          this.fontSupport.shouldPreserve(families, settings, variant);
-        plan = { fallback, skip };
+        const alreadyHandled = !fallback || hasEffectiveFallback(families, fallback, variant);
+        const preservation = alreadyHandled ? false : this.fontSupport.preservationFor(families, settings, variant);
+        plan = { fallback, skip: alreadyHandled || preservation === true,
+          uncovered: preservation instanceof RegExp ? preservation : null };
         plans.set(planKey, plan);
       }
-      if (plan.skip) {
+      if (plan.skip || (plan.uncovered && !this.hasUncoveredText(element, plan.uncovered))) {
         if (existing) this.managedStyles.restore(element);
         continue;
       }
@@ -202,6 +202,17 @@ export class FallbackController {
       });
     }
     return actions;
+  }
+
+  /** Only tiny declared font sets need text checks; never read descendant prose. */
+  private hasUncoveredText(element: HTMLElement, pattern: RegExp): boolean {
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      return pattern.test(element.value || element.placeholder || "");
+    }
+    for (let node = element.firstChild; node; node = node.nextSibling) {
+      if (node.nodeType === Node.TEXT_NODE && pattern.test(node.nodeValue || "")) return true;
+    }
+    return false;
   }
 
   private fontForVariant(variant: Variant, serif: boolean, settings: Settings): string {
