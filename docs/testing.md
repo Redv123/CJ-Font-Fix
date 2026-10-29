@@ -22,6 +22,29 @@ Choose checks for the behavior being changed. Unit tests establish deterministic
 | `npm run test:flatpak:headed:smoke` | Build and check one local SPA fixture in a visible Flatpak Chromium window; no live-site requests |
 | `npm run inspect:flatpak -- 'https://example.com/page'` | Open any HTTP(S) page with the built extension in visible Flatpak Chromium; pause for manual verification and print the final extension status |
 | `CJ_FLORES_DIR=.local-test-data/flores200_dataset npm run test:corpus` | Opt-in FLORES-200 page-language evaluation in real Chromium |
+| `npm run test:fonts` | Opt-in actual SC/TC/JP glyph-font selection, missing-font fallback, and restoration through Chromium DevTools Protocol |
+
+Install the browser binaries matching the current Playwright dependency before the first browser run, and again after a Playwright upgrade:
+
+```sh
+./node_modules/.bin/playwright install chromium
+```
+
+This includes full Chromium for extension tests and the separate headless shell used by default Playwright page fixtures. If only the shell is missing, use `./node_modules/.bin/playwright install chromium-headless-shell`.
+
+### Regression evidence
+
+For a reported interaction, reproduce its DOM shape and update sequence: direct text, text alongside links/emoji, and a prebuilt subtree are different cases. For a specific regression, show that the corresponding check fails before the fix and passes after it; keep expected results independent of the extension's generated markers. Review this match between the reported behavior, fixture, and assertion.
+
+For first-visible-frame claims, start sampling before the action, identify the website's own text, and require its text-owner rectangles to intersect the viewport. Record the number of visible samples and any initial interval with the wrong stack. Computed `font-family` establishes CSS state; a claim about actual glyph selection also needs Rendered Fonts evidence. A settled screenshot alone does not establish the absence of a transient switch.
+
+Test experimental mixed detection off/on separately. Distinguish enabling the option from activating local Chinese/Japanese decisions: an activation check needs independently recognizable passages using different regional fonts. Record when a live page stays single-language so its result is not reported as mixed-segmentation validation. The same separation applies to disabled correction, unavailable content scripts, and pages needing no intervention.
+
+### Actual rendered fonts
+
+`npm run test:fonts` loads the built extension on local intercepted pages and queries `CSS.getPlatformFontsForNode` for the page's original reading element. It checks the actual PostScript face and glyph count, not just computed CSS. Install **Noto Sans CJK SC**, **Noto Sans CJK TC**, **Noto Sans CJK JP**, **Noto Serif CJK JP**, and **Noto Serif CJK SC** in the browser environment first; missing prerequisites fail explicitly. The suite is excluded from `test:sites` because its font dependencies are environment-specific.
+
+Each regional case starts with the website's wrong-region Serif font, enables an explicit site choice and checks that all five Han glyphs use the selected Sans face, then checks a deliberately nonexistent font name: that name appears in computed CSS but the glyphs still use the website's font. Choosing the website font's own region must retain that website face ahead of the configured fallback, as required by the existing font-stack policy. Finally, disabling correction must restore the original computed stack and rendered face. A JSON attachment records the browser version and observed fonts. Explicit site choices isolate font application from language classification. These are settled-state checks; they do not establish live-site sampling accuracy or absence of transient visual flicker.
 
 ## Choose the browser
 
