@@ -1,7 +1,8 @@
-# Release notes — 0.9.6
+# Release notes — 0.9.7
 
 ## Changes
 
+- Fixed web fonts declaring only a few Chinese or Japanese characters preventing fallback correction for other text, while preserving the characters supplied by small logo fonts.
 - Delete all site settings now offers Undo instead of a browser confirmation dialog.
 - Add and edit website language settings inline, with edit/delete icons and updates that keep other language groups stable.
 - Fixed font-list errors blocking other Settings controls.
