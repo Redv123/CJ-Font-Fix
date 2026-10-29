@@ -2,6 +2,7 @@ import { chromium } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import browserPreflight from "./browser-preflight.mjs";
 
 const requestedUrl = process.argv[2];
 if (process.argv.length !== 3 || !requestedUrl) {
@@ -18,6 +19,7 @@ if (process.argv.length !== 3 || !requestedUrl) {
   }
 
   if (url) {
+    await browserPreflight();
     const profileDirectory = await mkdtemp(`${tmpdir()}/cj-font-inspect-`);
     let context;
     try {

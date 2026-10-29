@@ -9,6 +9,10 @@ Read the project document that matches the work:
 - `docs/testing.md` for test boundaries, real-browser checks, and Flatpak Chromium use.
 - `docs/releasing.md` for version and release work.
 
+## Browser test execution
+
+When the agent tool uses a restricted sandbox, run browser tests and inspection with `sandbox_permissions: "require_escalated"` on the first invocation. This includes `npm run test:local`, other browser scripts, and direct Playwright commands. Build, typecheck, unit tests, and `playwright test --list` can run in the sandbox. See [agent browser permissions](docs/testing.md#agent-browser-permissions) for the IPC preflight and diagnosis.
+
 ## Skill scope
 
 Use Chrome extension guidance when the answer or implementation depends on extension-specific behavior: Manifest V3, Chrome APIs, permissions, service workers, content-script lifecycle, extension messaging, packaging, or browser-store publication.

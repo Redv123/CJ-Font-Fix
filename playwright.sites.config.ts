@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
+  globalSetup: "./scripts/browser-preflight.mjs",
   testDir: "./tests/sites",
   fullyParallel: false,
   workers: 1,

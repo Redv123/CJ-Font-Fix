@@ -70,7 +70,15 @@ CJ_TEST_CHROMIUM_EXECUTABLE=./scripts/flatpak-chromium.sh ./node_modules/.bin/pl
 
 Use `CJ_TEST_HEADLESS=0` for a visual question or a page needing human verification. First run `npm run test:flatpak:headed:smoke` if visible Flatpak automation has not been checked in the current environment. The wrapper owns the app ID and launch setup; use it directly. The Flatpak full-suite commands are for deliberate regression passes.
 
-If sandbox permissions prevent launch, retry the same command in an environment allowed to run the browser. `Unable to allocate instance id` is a Flatpak session/permission failure, not evidence of a wrong app ID. A launch failure alone does not justify switching browser or enabling a visible window.
+### Agent browser permissions
+
+Run browser commands from the agent tool with `sandbox_permissions: "require_escalated"` on the first invocation when the tool uses a restricted sandbox. This applies to `npm run test:local`, all other browser test scripts, direct Playwright invocations, and `inspect:flatpak`. The tool's approval policy still governs permission; repository scripts cannot grant it. Keep build, typecheck, unit tests, and `playwright test --list` in the sandbox.
+
+The restricted environment on this machine denies local socket operations: a Node IPC probe fails with `EPERM`, and Chromium previously trapped during startup with `setsockopt: Operation not permitted`, generating a system core dump. The same probe and browser tests pass in the permitted environment. Use the permitted environment directly instead of reproducing that known crash at the start of each run.
+
+Both Playwright configs share `scripts/browser-preflight.mjs` through global setup; manual inspection calls it before launching Chromium. It checks a temporary local IPC socket and cleans it up without starting a browser. An IPC denial stops the command once with `[browser-preflight]`, before workers or Chromium start. It does not skip tests, report success, or retry browser launches. To check IPC alone, run `node scripts/browser-preflight.mjs`. Passing the probe establishes that prerequisite only; the browser tests must still pass.
+
+If permission is denied, report the blocked check and the approval reason. After approval, run the same command in the permitted environment. `Unable to allocate instance id` is a Flatpak session/permission failure, not evidence of a wrong app ID. A launch failure alone does not justify switching browser or enabling a visible window.
 
 All automation uses fresh temporary profiles. A visible Flatpak window has none of the user's ordinary window's cookies, extensions, login, or completed verification, and closes after the test. For issues requiring that existing session, use the installed extension and user-guided DevTools observations. Keep automation off the everyday profile to avoid profile locking and cleanup conflicts. Attaching to an existing window requires that it was launched with an appropriate debugging endpoint.
 
