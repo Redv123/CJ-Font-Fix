@@ -35,7 +35,9 @@ This includes full Chromium for extension tests and the separate headless shell 
 
 ### Automated gate
 
-`playwright.local.config.ts` reuses the site-suite settings and excludes the live-site, corpus, and rendered-font suites. New ordinary browser specs join the local gate by default. Keep any new network-dependent or separately provisioned suite out of that gate explicitly. The **Checks** workflow runs unit tests and `test:local` on pushes to `main` and pull requests. The release workflow calls the same checks and waits for success before packaging; browser dependencies are installed in CI. A failed attempt fails the local gate rather than being hidden by a retry. Available browser failure artifacts are retained for seven days.
+`playwright.local.config.ts` reuses the site-suite settings and excludes the live-site, corpus, and rendered-font suites. New ordinary browser specs join the local gate by default. Keep any new network-dependent or separately provisioned suite out of that gate explicitly. Run `npm run test:local` on a suitable local machine; a failed attempt fails the local gate rather than being hidden by a retry.
+
+The **Checks** workflow runs unit tests, browser-test TypeScript checking, and the extension build on pushes to `main` and pull requests. The build includes source TypeScript checking. The release workflow calls the same checks and waits for success before packaging. GitHub Actions does not install Chromium or execute browser tests; browser validation remains local.
 
 The popup layout cases load the built extension's `popup.html`, let its entry initialize, and query a local HTTP page or a browser-protected active tab through real extension messaging. They verify page state, version, and shipped styles without filling output fields or adding CSS. The harness opens the extension page in a tab; it does not establish native toolbar-popup window sizing.
 
