@@ -9,12 +9,27 @@ class TestNode {
   isConnected = true;
   root: object | null = null;
 
+  get firstChild(): TestNode | null {
+    return this.childNodes[0] || null;
+  }
+
   getRootNode(): object {
     return this.root || document;
   }
 }
 
-class TestElement extends TestNode {}
+class TestElement extends TestNode {
+  closest(): null { return null; }
+
+  contains(node: TestNode): boolean {
+    let current: TestNode | null = node;
+    while (current) {
+      if (current === this) return true;
+      current = current.parentElement;
+    }
+    return false;
+  }
+}
 class TestHTMLElement extends TestElement {}
 class TestShadowRoot {
   constructor(readonly host: TestHTMLElement) {}
@@ -76,6 +91,90 @@ function installWalker(): void {
 }
 
 describe("small updates after interaction", () => {
+  it("takes text owners inside added wrappers with inline content and retains the root scan", () => {
+    const body = browserTree();
+    installWalker();
+    const container = childOf(body);
+    const paragraph = childOf(container);
+    paragraph.childNodes.push(Object.assign(new TestNode(), {
+      nodeType: 3, nodeValue: "新しい返信です", parentElement: paragraph
+    }));
+    childOf(paragraph);
+    const queue = new UpdateQueue();
+    queue.consume();
+    queue.queueRoot(container as unknown as Node, true);
+    expect(queue.takeSmallNewTextUpdate(() => false)).toEqual({
+      fullScan: false, redetectLanguage: false, roots: [], elements: [paragraph]
+    });
+    expect(queue.consume().roots).toEqual([container]);
+  });
+
+  it("bounds discovery within an added subtree and keeps unvisited text on the normal queue", () => {
+    const body = browserTree();
+    installWalker();
+    const container = childOf(body);
+    for (let i = 0; i < 129; i++) childOf(container);
+    const paragraph = childOf(container);
+    paragraph.childNodes.push(Object.assign(new TestNode(), {
+      nodeType: 3, nodeValue: "後から処理する返信", parentElement: paragraph
+    }));
+    const queue = new UpdateQueue();
+    queue.consume();
+    queue.queueRoot(container as unknown as Node, true);
+    expect(queue.takeSmallNewTextUpdate(() => false)).toBeNull();
+    expect(queue.consume().roots).toEqual([container]);
+  });
+
+  it("takes fresh direct text without consuming large surrounding updates", () => {
+    const body = browserTree();
+    installWalker();
+    const container = childOf(body);
+    const paragraph = childOf(container);
+    paragraph.childNodes.push(Object.assign(new TestNode(), { nodeType: 3, nodeValue: "新しい返信です", parentElement: paragraph }));
+    const queue = new UpdateQueue();
+    queue.consume();
+    queueRoot(queue, container);
+    for (let i = 0; i < 180; i++) queueRoot(queue, childOf(container));
+    queue.queueRoot(paragraph as unknown as Node, true);
+    expect(queue.isSmallLocalUpdate()).toBe(false);
+    expect(queue.takeSmallNewTextUpdate(() => false)).toEqual({
+      fullScan: false, redetectLanguage: false, roots: [], elements: [paragraph]
+    });
+    expect(queue.takeSmallNewTextUpdate(() => false)).toBeNull();
+    expect(queue.consume().roots).toEqual([container]);
+  });
+
+  it("keeps English, managed, oversized, shadow, and invalidated text on the normal queue", () => {
+    const body = browserTree();
+    installWalker();
+    const paragraph = childOf(body);
+    const text = Object.assign(new TestNode(), { nodeType: 3, nodeValue: "English text", parentElement: paragraph });
+    paragraph.childNodes.push(text);
+    const queue = new UpdateQueue();
+    queue.consume();
+    const remember = () => queue.queueRoot(paragraph as unknown as Node, true);
+    remember();
+    expect(queue.takeSmallNewTextUpdate(() => false)).toBeNull();
+    text.nodeValue = "新的中文回复";
+    remember();
+    expect(queue.takeSmallNewTextUpdate(() => true)).toBeNull();
+    text.nodeValue = "文".repeat(10001);
+    remember();
+    expect(queue.takeSmallNewTextUpdate(() => false)).toBeNull();
+    text.nodeValue = "新的中文回复";
+    paragraph.root = new TestShadowRoot(body);
+    remember();
+    expect(queue.takeSmallNewTextUpdate(() => false)).toBeNull();
+    paragraph.root = body.root;
+    remember();
+    queue.requestLanguageDetection();
+    expect(queue.takeSmallNewTextUpdate(() => false)).toBeNull();
+    expect(queue.consume()).toMatchObject({ redetectLanguage: true, roots: [paragraph] });
+    remember();
+    queue.requestFullScan();
+    expect(queue.takeSmallNewTextUpdate(() => false)).toBeNull();
+  });
+
   it("requires a local update with no pending language detection", () => {
     const body = browserTree();
     installWalker();
@@ -141,6 +240,57 @@ describe("small updates after interaction", () => {
     queueRoot(queue, paragraph);
     expect(queue.isSmallLocalUpdate()).toBe(false);
     expect(queue.consume().roots).toEqual([paragraph]);
+  });
+
+  it("takes small clicked content without consuming unrelated or ancestor invalidations", () => {
+    const body = browserTree();
+    installWalker();
+    const widget = childOf(body);
+    const button = childOf(widget);
+    const content = childOf(widget);
+    content.childNodes.push(Object.assign(new TestNode(), { nodeType: 3, nodeValue: "新增中文" }));
+    const unrelated = childOf(body);
+    const queue = new UpdateQueue();
+    queue.consume();
+    queueRoot(queue, widget);
+    const pending = Array.from({ length: 180 }, () => childOf(unrelated));
+    for (const element of pending) queueRoot(queue, element);
+    queueElement(queue, content);
+    expect(queue.isSmallLocalUpdate()).toBe(false);
+    expect(queue.takeSmallInteractionUpdate(button as unknown as Element)).toEqual({
+      fullScan: false, redetectLanguage: false, roots: [content], elements: []
+    });
+    expect(queue.consume()).toEqual({
+      fullScan: false, redetectLanguage: false, roots: [widget, ...pending], elements: []
+    });
+  });
+
+  it("retains English, oversized, and language-invalidated content for normal processing", () => {
+    const body = browserTree();
+    installWalker();
+    const widget = childOf(body);
+    const button = childOf(widget);
+    const content = childOf(widget);
+    const text = Object.assign(new TestNode(), { nodeType: 3, nodeValue: "English text" });
+    content.childNodes.push(text);
+    const queue = new UpdateQueue();
+    queue.consume();
+    queueElement(queue, content);
+    expect(queue.takeSmallInteractionUpdate(button as unknown as Element)).toBeNull();
+    text.nodeValue = "文".repeat(10001);
+    expect(queue.takeSmallInteractionUpdate(button as unknown as Element)).toBeNull();
+    text.nodeValue = "中文";
+    queue.requestLanguageDetection();
+    expect(queue.takeSmallInteractionUpdate(button as unknown as Element)).toBeNull();
+    expect(queue.consume()).toMatchObject({ redetectLanguage: true, elements: [content] });
+    for (let i = 0; i < 129; i++) childOf(content);
+    queueElement(queue, content);
+    expect(queue.takeSmallInteractionUpdate(button as unknown as Element)).toBeNull();
+    expect(queue.consume().elements).toEqual([content]);
+    queueElement(queue, content);
+    queue.requestFullScan();
+    expect(queue.takeSmallInteractionUpdate(button as unknown as Element)).toBeNull();
+    expect(queue.consume().fullScan).toBe(true);
   });
 });
 

@@ -13,6 +13,7 @@ import type { ExtendedDetection } from "../page/page-language";
 import { PageObserver } from "../page/page-observer";
 import { subtreeContainsCjk } from "../page/candidate-scan";
 import { UpdateQueue } from "../page/update-queue";
+import type { PendingPageUpdate } from "../page/update-queue";
 import { DEFAULTS, SETTINGS_STORAGE_KEYS, settingsFromStorage } from "../settings/defaults";
 import { getPlatformOs } from "../shared/platform";
 import type { ActionStateMessage, ContentMessage, Settings } from "../shared/types";
@@ -97,8 +98,8 @@ function startContentApplication(): void {
   }
 
   // One run consumes a snapshot of queued work. At most one immediate second
-  // pass is allowed; anything arriving later is scheduled through the throttle.
-  async function run() {
+  // pass is allowed; partial interaction work leaves the rest to the throttle.
+  async function run(interactionUpdate?: PendingPageUpdate) {
     if (applying) {
       rerunRequested = true;
       return;
@@ -109,7 +110,7 @@ function startContentApplication(): void {
       let passes = 0;
       do {
         rerunRequested = false;
-        const update = updates.consume();
+        const update = interactionUpdate ?? updates.consume();
         let fullScan = update.fullScan;
         const redetect = update.redetectLanguage;
         const { roots, elements } = update;
@@ -124,7 +125,7 @@ function startContentApplication(): void {
           );
         }
         if (oldVariant !== detection.variant) fullScan = true;
-        if (!settings.simpleMode && settings.preserveWebsiteFonts && detection.variant) {
+        if (!settings.simpleMode && settings.preserveWebsiteFonts && detection.variant && !installedFontsLoaded) {
           await loadInstalledFonts();
         }
         const result = applyFallbacks(fullScan, roots, elements);
@@ -136,7 +137,7 @@ function startContentApplication(): void {
         detection.appliedVariants = result.variants;
         detection.appliedFonts = result.fonts;
         passes++;
-      } while ((rerunRequested || updates.hasWork) && passes < 2);
+      } while (!interactionUpdate && (rerunRequested || updates.hasWork) && passes < 2);
       const inUse = settings.simpleMode
         ? Boolean(simpleMode.appliedLang)
         : (detection.changedElements || 0) > 0;
@@ -166,17 +167,34 @@ function startContentApplication(): void {
   // follow-up pass instead, preserving the read-then-write batching invariant.
   function requestRunForQueuedWork() {
     if (applying) rerunRequested = true;
-    else scheduleRun();
+    else {
+      const newText = !settings.simpleMode && settings.dynamicDetection && detection.variant
+        ? updates.takeSmallNewTextUpdate((element) => managedStyles.has(element)) : null;
+      if (newText) {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = 0;
+        void run(newText);
+      } else scheduleRun();
+    }
   }
 
-  document.addEventListener("click", () => {
+  document.addEventListener("click", (event) => {
+    const target = detection.variant
+      ? event.composedPath().find((node): node is HTMLElement => node instanceof HTMLElement)
+      : undefined;
     // Let page handlers finish inserting content before checking queued work.
     queueMicrotask(() => {
       if (applying || settings.simpleMode || !settings.dynamicDetection ||
-          !detection.variant || settings.mixedLanguageDetection || !updates.isSmallLocalUpdate()) return;
+          !detection.variant || settings.mixedLanguageDetection) return;
+      let interactionUpdate: PendingPageUpdate | undefined;
+      if (!updates.isSmallLocalUpdate()) {
+        interactionUpdate = target ? updates.takeSmallInteractionUpdate(target) ?? undefined : undefined;
+        if (!interactionUpdate) return;
+      }
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = 0;
-      void run();
+      // A partial interaction pass leaves unrelated work on the normal timer.
+      void run(interactionUpdate);
     });
   });
 

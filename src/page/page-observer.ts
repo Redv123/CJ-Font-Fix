@@ -94,8 +94,7 @@ export class PageObserver {
         }
         for (const node of mutation.removedNodes) {
           cleanedManagedContent = managedStyles.releaseRemovedSubtree(node,
-            dynamic && !redetectPage && mutation.removedNodes.length === 1 &&
-              !this.dependencies.settings().mixedLanguageDetection
+            dynamic && !redetectPage && mutation.removedNodes.length === 1
               ? mutation.target : undefined
           ) || cleanedManagedContent;
         }
@@ -166,7 +165,7 @@ export class PageObserver {
       if (target?.tagName === "TITLE") {
         if (!this.pageLanguageIsStable()) updates.requestLanguageDetection();
       } else {
-        updates.queueElement(target);
+        updates.queueElement(target, true);
         if (!this.pageLanguageIsStable() && languageDetector.touchesSample(target)) {
           updates.requestLanguageDetection();
         }
@@ -193,8 +192,8 @@ export class PageObserver {
       ));
     }
     for (const node of mutation.addedNodes) {
-      if (node.nodeType === Node.ELEMENT_NODE) updates.queueRoot(node);
-      else if (node.nodeType === Node.TEXT_NODE) updates.queueElement(target);
+      if (node.nodeType === Node.ELEMENT_NODE) updates.queueRoot(node, true);
+      else if (node.nodeType === Node.TEXT_NODE) updates.queueElement(target, true);
     }
     if (!this.pageLanguageIsStable() && (
       languageDetector.touchesSample(target) ||
