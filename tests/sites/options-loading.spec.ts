@@ -19,6 +19,13 @@ test.beforeAll(async () => {
     headless: process.env.CJ_TEST_HEADLESS !== "0",
     args: [`--disable-extensions-except=${directory}`, `--load-extension=${directory}`]
   });
+  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
+  // onInstalled repairs all six choices asynchronously. Let that finish before
+  // tests replace them with intentionally unavailable saved names.
+  await expect.poll(() => worker.evaluate(async (keys) => {
+    const stored = await chrome.storage.sync.get(keys);
+    return keys.every((key) => typeof stored[key] === "string");
+  }, Object.keys(savedFonts))).toBe(true);
 });
 test.afterAll(async () => {
   await context?.close();
