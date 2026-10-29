@@ -137,8 +137,6 @@ export function hasStrongChineseJapaneseMix(
 ): boolean {
   let pageEvidenceCharacters = 0;
   let opposingCharacters = 0;
-  let opposingBlocks = 0;
-  let longestOpposingBlock = 0;
 
   for (const { evidence } of samples) {
     const isOpposing = pageVariant === "jp"
@@ -146,8 +144,6 @@ export function hasStrongChineseJapaneseMix(
       : evidence.strongVariant === "jp";
     if (isOpposing) {
       opposingCharacters += evidence.cjkCount;
-      opposingBlocks++;
-      longestOpposingBlock = Math.max(longestOpposingBlock, evidence.cjkCount);
       continue;
     }
 
@@ -168,6 +164,5 @@ export function hasStrongChineseJapaneseMix(
 
   const classifiedCharacters = opposingCharacters + pageEvidenceCharacters;
   if (opposingCharacters < 40 || pageEvidenceCharacters < 40) return false;
-  if (Math.min(opposingCharacters, pageEvidenceCharacters) / classifiedCharacters < 0.15) return false;
-  return opposingBlocks >= 2 || longestOpposingBlock >= 40;
+  return Math.min(opposingCharacters, pageEvidenceCharacters) / classifiedCharacters >= 0.15;
 }

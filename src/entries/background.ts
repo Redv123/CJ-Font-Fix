@@ -121,9 +121,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     const repaired: Partial<Record<FontSettingKey, string>> = {};
     for (const key of keys) {
       const { variant, category } = FONT_SETTINGS[key];
-      repaired[key] = Object.hasOwn(stored, key) && stored[key] === ""
-        ? ""
-        : validChoice(fonts, stored[key], variant, category);
+      repaired[key] = validChoice(fonts, stored[key], variant, category);
     }
     await chrome.storage.sync.set(repaired);
   } catch (error) {

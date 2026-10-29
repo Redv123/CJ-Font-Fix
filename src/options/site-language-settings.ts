@@ -1,7 +1,7 @@
 import { byId, errorMessage } from "../shared/dom";
 import { message, variantLabel } from "../shared/i18n";
 import { isSiteOverride, normalizeHostname, siteRulesFromStorage } from "../settings/site-overrides";
-import type { SiteChoice, SiteRuleEdit, SiteRuleResult, SiteRuleSnapshot, SiteScope } from "../shared/types";
+import type { SiteChoice, SiteRuleResult, SiteRuleSnapshot, SiteScope } from "../shared/types";
 
 interface SiteEntry {
   hostname: string;
@@ -428,7 +428,7 @@ export function setupSiteLanguageSettings(): void {
       for (const control of [host, scope, language, save, cancel]) control.disabled = true;
       clearButton.disabled = true;
       try {
-        const reply = await persist({ type: "editSiteRule", hostname: updated.hostname, scope: updated.scope, value: updated.choice,
+        const reply: SiteRuleResult = await chrome.runtime.sendMessage({ type: "editSiteRule", hostname: updated.hostname, scope: updated.scope, value: updated.choice,
           previousHostname: entry.hostname, previousScope: entry.scope });
         if (!reply.ok) throw new Error(reply.errorKey ? message(reply.errorKey) : reply.error);
         editors.delete(key);
@@ -471,7 +471,7 @@ export function setupSiteLanguageSettings(): void {
     let shrinking: HTMLElement | null = null;
     let animation: Animation | null = null;
     try {
-      const reply = await persist({ type: "editSiteRule", scope: entry.scope, hostname: entry.hostname, value: null });
+      const reply: SiteRuleResult = await chrome.runtime.sendMessage({ type: "editSiteRule", scope: entry.scope, hostname: entry.hostname, value: null });
       if (!reply.ok) throw new Error(reply.errorKey ? message(reply.errorKey) : reply.error);
       const nextKey = Array.from(rowButtons.keys()).find((key) => key !== entryKey(entry) &&
         rowButtons.get(key)?.isConnected);
@@ -571,10 +571,6 @@ export function setupSiteLanguageSettings(): void {
     }
   }
 
-  async function persist(edit: SiteRuleEdit): Promise<SiteRuleResult> {
-    return chrome.runtime.sendMessage(edit);
-  }
-
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (saveButton.disabled || writeBusy || bulkBusy) return;
@@ -597,7 +593,7 @@ export function setupSiteLanguageSettings(): void {
     writeBusy = true;
     setBusy(true);
     try {
-      const reply = await persist({ type: "editSiteRule", hostname: updated.hostname, scope, value: updated.choice, createOnly: true });
+      const reply: SiteRuleResult = await chrome.runtime.sendMessage({ type: "editSiteRule", hostname: updated.hostname, scope, value: updated.choice, createOnly: true });
       if (!reply.ok) throw new Error(reply.errorKey ? message(reply.errorKey) : reply.error);
       await restore();
       highlightEntry(updated);

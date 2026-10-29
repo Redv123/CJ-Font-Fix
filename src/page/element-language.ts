@@ -22,7 +22,6 @@ export class ElementLanguage {
   private readonly classificationCache = new WeakMap<Element, "sc" | "tc">();
 
   constructor(
-    private readonly pageVariant: Variant | null,
     private readonly settings: Settings,
     private readonly classifyChinese: (text: string) => "sc" | "tc"
   ) {}
@@ -46,7 +45,6 @@ export class ElementLanguage {
   }
 
   private classifiedVariantFor(owner: Element): Variant | null {
-    if (owner === document.documentElement) return this.pageVariant;
     const cached = this.classificationCache.get(owner);
     if (cached) return cached;
     const variant = this.classifyChinese(classificationSample(owner));

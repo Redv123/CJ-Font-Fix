@@ -82,7 +82,7 @@ export class FallbackController {
 
     const candidates = this.collectCandidates(fullScan, roots, elements);
     this.mixedLanguage.prepare(candidates, fullScan, pageVariant, mixedEligible, [...roots, ...elements]);
-    const elementLanguage = new ElementLanguage(pageVariant, settings, this.classifyChinese);
+    const elementLanguage = new ElementLanguage(settings, this.classifyChinese);
     const affected = this.managedStyles.affected(fullScan, roots, elements);
     const entries = this.resolveEntries(
       candidates, affected, elementLanguage, pageVariant, forceOverride, this.mixedLanguage.isActive

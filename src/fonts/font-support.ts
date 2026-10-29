@@ -77,17 +77,16 @@ export class FontSupport {
   shouldPreserve(families: string[], settings: Settings, desiredVariant?: Variant): boolean {
     const genericIndex = families.findIndex(isGenericFamily);
     const reachable = genericIndex < 0 ? families : families.slice(0, genericIndex);
-    const explicit = reachable.filter((family) => !isGenericFamily(family));
-    if (!explicit.length) return false;
+    if (!reachable.length) return false;
 
     if (!settings.preserveWebsiteFonts) return false;
-    const custom = explicit.find((family) => this.customCjkFamilies.has(family.toLowerCase()));
+    const custom = reachable.find((family) => this.customCjkFamilies.has(family.toLowerCase()));
     if (custom) {
       const variant = regionalVariantForFamily(custom);
       if (isFangsongFamily(custom)) return desiredVariant !== "jp";
       return !desiredVariant || !variant || variant === desiredVariant;
     }
-    const known = explicit.find((family) =>
+    const known = reachable.find((family) =>
       this.installedFamilies.has(normalizeFamily(family).toLowerCase()) ||
       (this.platformOs === "linux" && settings.trustWindowsFonts && windowsCjkVariantForFamily(family) !== null)
     );

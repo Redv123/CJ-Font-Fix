@@ -30,7 +30,7 @@ describe("browser-owned language contexts", () => {
       const root = languageOwner("zh-Hans-CN");
       vi.stubGlobal("document", { documentElement: root });
       const owner = languageOwner(language);
-      const resolver = new ElementLanguage("sc", settings(), () => "sc");
+      const resolver = new ElementLanguage(settings(), () => "sc");
 
       expect(resolver.browserHandlesLanguageFor(elementInside(owner))).toBe(true);
     }
@@ -39,7 +39,7 @@ describe("browser-owned language contexts", () => {
   it("does not trust an unrelated language declared only on the page root", () => {
     const root = languageOwner("en");
     vi.stubGlobal("document", { documentElement: root });
-    const resolver = new ElementLanguage("sc", settings(), () => "sc");
+    const resolver = new ElementLanguage(settings(), () => "sc");
 
     expect(resolver.browserHandlesLanguageFor(elementInside(root))).toBe(false);
   });
@@ -49,7 +49,7 @@ describe("browser-owned language contexts", () => {
       const root = languageOwner("en");
       vi.stubGlobal("document", { documentElement: root });
       const owner = languageOwner(language);
-      const resolver = new ElementLanguage("sc", settings(), () => "sc");
+      const resolver = new ElementLanguage(settings(), () => "sc");
 
       expect(resolver.browserHandlesLanguageFor(elementInside(owner))).toBe(false);
     }
@@ -58,7 +58,7 @@ describe("browser-owned language contexts", () => {
   it("does not trust bare root lang=zh", () => {
     const root = languageOwner("zh");
     vi.stubGlobal("document", { documentElement: root });
-    const resolver = new ElementLanguage("sc", settings(), () => "sc");
+    const resolver = new ElementLanguage(settings(), () => "sc");
 
     expect(resolver.browserHandlesLanguageFor(elementInside(root))).toBe(false);
   });
@@ -67,7 +67,6 @@ describe("browser-owned language contexts", () => {
     const root = languageOwner("zh-Hans-CN");
     vi.stubGlobal("document", { documentElement: root });
     const resolver = new ElementLanguage(
-      "sc",
       settings({ trustCjkLang: false }),
       () => "sc"
     );
@@ -92,7 +91,7 @@ describe("bare Chinese language samples", () => {
       createTreeWalker: () => ({ nextNode: () => nodes[index++] || null })
     });
     const classify = vi.fn(() => "tc" as const);
-    const resolver = new ElementLanguage("sc", settings(), classify);
+    const resolver = new ElementLanguage(settings(), classify);
     expect(resolver.explicitVariantFor(elementInside(owner))).toBe("tc");
     expect(classify).toHaveBeenCalledExactlyOnceWith(chunks.join("").slice(0, 3000));
   });
@@ -113,11 +112,11 @@ describe("bare Chinese language samples", () => {
     });
     vi.stubGlobal("document", { documentElement: languageOwner("en"), createTreeWalker });
     const classify = vi.fn((sample: string) => sample.startsWith("简") ? "sc" as const : "tc" as const);
-    const first = new ElementLanguage("sc", settings(), classify);
+    const first = new ElementLanguage(settings(), classify);
     expect(first.explicitVariantFor(elementInside(owner))).toBe("sc");
     text = "繁".repeat(3000);
     expect(first.explicitVariantFor(elementInside(owner))).toBe("sc");
-    const next = new ElementLanguage("sc", settings(), classify);
+    const next = new ElementLanguage(settings(), classify);
     expect(next.explicitVariantFor(elementInside(owner))).toBe("tc");
     expect(createTreeWalker).toHaveBeenCalledTimes(2);
     expect(classify).toHaveBeenCalledTimes(2);

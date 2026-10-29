@@ -57,7 +57,7 @@ export class PageObserver {
     const hostOverride = getSiteOverride(current);
     if (hostOverride === "off") return;
     if (current.simpleMode) {
-      simpleMode.startBootstrap(true);
+      simpleMode.startBootstrap();
       return;
     }
 

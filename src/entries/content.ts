@@ -42,7 +42,7 @@ function startContentApplication(): void {
   let installedFontsLoaded = false;
   const languageDetector = new PageLanguageDetector();
   const simpleMode = new SimpleMode(() => {
-    requestFullScan(true);
+    updates.requestFullScan(true);
     requestRunForQueuedWork();
   }, subtreeContainsCjk);
 
@@ -74,10 +74,6 @@ function startContentApplication(): void {
     simpleMode,
     requestRun: requestRunForQueuedWork
   });
-
-  function requestFullScan(redetect = false) {
-    updates.requestFullScan(redetect);
-  }
 
   function pageIsDormant(): boolean {
     return !detection.variant && detection.reason === "No CJK text";
@@ -200,7 +196,6 @@ function startContentApplication(): void {
   // observer lifecycle and the next language/style run.
   async function loadSettings() {
     settings = settingsFromStorage(await chrome.storage.sync.get(SETTINGS_STORAGE_KEYS));
-    settings.siteOverrides = settings.siteOverrides || {};
   }
 
   async function loadInstalledFonts(): Promise<void> {
@@ -253,7 +248,7 @@ function startContentApplication(): void {
         if (!reply.ok) throw new Error(reply.error);
         await loadSettings();
         pageObserver.configure();
-        requestFullScan(true);
+        updates.requestFullScan(true);
         await run();
         sendResponse({ ok: true });
       })().catch((error: unknown) => sendResponse({ ok: false, error: String(error) }));
@@ -280,7 +275,7 @@ function startContentApplication(): void {
     if (changedKeys.every((key) => key === "siteOverrides" || key === "siteDomainOverrides") &&
         getSiteOverride(settings) === previousSiteChoice) return;
     pageObserver.configure();
-    requestFullScan(true);
+    updates.requestFullScan(true);
     await run();
   });
 
@@ -289,7 +284,7 @@ function startContentApplication(): void {
   // separate reason to reconsider the page sample and its applied styles.
   window.addEventListener("popstate", () => {
     if (settings.simpleMode || !settings.dynamicDetection) return;
-    requestFullScan(true);
+    updates.requestFullScan(true);
     requestRunForQueuedWork();
   });
 
@@ -300,7 +295,7 @@ function startContentApplication(): void {
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", () => {
         pageObserver.configure();
-        requestFullScan(true);
+        updates.requestFullScan(true);
         scheduleRun(0);
       }, { once: true });
     }
@@ -311,7 +306,7 @@ function startContentApplication(): void {
       if (fontRefreshTimer) clearTimeout(fontRefreshTimer);
       fontRefreshTimer = setTimeout(() => {
         fontRefreshTimer = 0;
-        requestFullScan(false);
+        updates.requestFullScan(false);
         scheduleRun(0);
       }, 120);
     };

@@ -48,6 +48,13 @@ describe("regional font defaults", () => {
     expect(validChoice(fonts, "Arial", "sc", "sans")).toBe("Arial");
   });
 
+  it.each(["sans", "serif"] as const)("keeps an explicitly empty %s choice while defaulting a missing choice", (category) => {
+    expect(validChoice(fonts, "", "sc", category)).toBe("");
+    expect(validChoice(fonts, undefined, "sc", category)).toBe(
+      category === "serif" ? "Noto Serif CJK SC" : "Noto Sans CJK SC"
+    );
+  });
+
   it("matches saved choices by ID or display name without regard to case", () => {
     const aliased: InstalledFont[] = [{ fontId: "NotoSansJP", displayName: "Noto Sans JP" }];
     expect(findInstalled(aliased, " notosansjp ")?.fontId).toBe("NotoSansJP");

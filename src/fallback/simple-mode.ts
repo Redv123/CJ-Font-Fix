@@ -32,10 +32,10 @@ export class SimpleMode {
     return this.currentAppliedLang;
   }
 
-  startBootstrap(enabled: boolean): void {
+  startBootstrap(): void {
     this.stopBootstrap();
     const root = document.documentElement;
-    if (!enabled || !root) return;
+    if (!root) return;
 
     this.observer = new MutationObserver((mutations) => {
       const gainedCjk = mutations.some((mutation) => {

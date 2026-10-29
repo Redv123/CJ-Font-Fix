@@ -75,6 +75,12 @@ export function isFangsongFamily(family: string): boolean {
   return /fang[\s-]?song|仿宋|fandol[\s-]?fang/i.test(normalizeFamily(family));
 }
 
+function conflictsWithVariant(family: string, desiredVariant: Variant): boolean {
+  const variant = regionalVariantForFamily(family);
+  return (variant !== null && variant !== desiredVariant) ||
+    (desiredVariant === "jp" && isFangsongFamily(family));
+}
+
 /** An existing choice is useful only before generic and wrong-region fonts. */
 export function hasEffectiveFallback(
   families: readonly string[], fallback: string, desiredVariant?: Variant
@@ -83,11 +89,9 @@ export function hasEffectiveFallback(
   if (existingIndex < 0) return false;
   const firstGeneric = families.findIndex(isGenericFamily);
   if (firstGeneric >= 0 && existingIndex > firstGeneric) return false;
-  return !desiredVariant || !families.slice(0, existingIndex).some((family) => {
-    const variant = regionalVariantForFamily(family);
-    return (variant !== null && variant !== desiredVariant) ||
-      (desiredVariant === "jp" && isFangsongFamily(family));
-  });
+  return !desiredVariant || !families.slice(0, existingIndex).some((family) =>
+    conflictsWithVariant(family, desiredVariant)
+  );
 }
 
 /**
@@ -149,11 +153,7 @@ export function composeFontFamily(
     regionalVariantForFamily(family) !== null ||
     (desiredVariant === "jp" && isFangsongFamily(family));
   const regionalInsertion = desiredVariant
-    ? families.findIndex((family) => {
-      const variant = regionalVariantForFamily(family);
-      return (variant !== null && variant !== desiredVariant) ||
-        (desiredVariant === "jp" && isFangsongFamily(family));
-    })
+    ? families.findIndex((family) => conflictsWithVariant(family, desiredVariant))
     : -1;
   const genericInsertion = families.findIndex((family) => GENERIC_FAMILIES.has(family.toLowerCase()));
   let output: string[];

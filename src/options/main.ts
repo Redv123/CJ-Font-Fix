@@ -198,9 +198,7 @@ async function restore(): Promise<void> {
   const repairedFonts: Partial<Record<FontSettingKey, string>> = {};
   for (const key of fontKeys) {
     const { variant, category } = FONT_SETTINGS[key];
-    const choice = Object.hasOwn(stored, key) && stored[key] === ""
-      ? ""
-      : validChoice(installedFonts, values[key], variant, category);
+    const choice = validChoice(installedFonts, stored[key], variant, category);
     byId<HTMLSelectElement>(key).value = choice;
     repairedFonts[key] = choice;
   }

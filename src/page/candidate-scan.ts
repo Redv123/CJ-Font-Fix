@@ -48,7 +48,7 @@ export function hasDirectCjkText(element: Element): boolean {
 
 function canAddCandidate(candidates: Set<HTMLElement>, element: Element | null): element is HTMLElement {
   return element instanceof HTMLElement && !candidates.has(element) && isInsideBody(element) &&
-    !element.matches(EXCLUDED) && !closestComposed(element, EXCLUDED);
+    !closestComposed(element, EXCLUDED);
 }
 
 export function addCandidate(candidates: Set<HTMLElement>, element: Element | null): void {
@@ -110,7 +110,7 @@ export function subtreeContainsCjk(node: Node | null): boolean {
   }
   const isFragment = node instanceof ShadowRoot;
   if (!isFragment && !(node instanceof Element)) return false;
-  if (node instanceof Element && (node.matches(EXCLUDED) || closestComposed(node, EXCLUDED))) return false;
+  if (node instanceof Element && closestComposed(node, EXCLUDED)) return false;
 
   const shadowRoots: ShadowRoot[] = [];
   if (node instanceof Element && node.shadowRoot) shadowRoots.push(node.shadowRoot);

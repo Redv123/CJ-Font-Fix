@@ -72,13 +72,14 @@ export function defaultFor(
   return "";
 }
 
-/** Keep a saved installed family; otherwise use this platform's first match. */
+/** Preserve an explicit empty choice; repair missing or unavailable families. */
 export function validChoice(
   fonts: readonly InstalledFont[],
   value: unknown,
   variant: Variant,
   category: FontCategory = "sans"
 ): string {
+  if (value === "") return "";
   return findInstalled(fonts, value)?.fontId ?? defaultFor(fonts, variant, category);
 }
 
